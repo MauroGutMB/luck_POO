@@ -18,7 +18,7 @@ public class CardRenderer {
     
     // Dimensões das cartas no sprite sheet (medidas da imagem real)
     // A imagem tem 14 colunas e 5 linhas total
-    // Cada carta tem 80x124 pixels (ajustado para evitar overlap)
+    // Cada carta tem 96x128 pixels (ajustado para evitar overlap)
     private static final int CARD_WIDTH = 96;
     private static final int CARD_HEIGHT = 128;
     private static final int COLS = 13; // 13 ranks (A até K)

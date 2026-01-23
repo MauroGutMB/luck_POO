@@ -110,7 +110,7 @@ public class GameScreen extends Screen {
     
     private void dealInitialHand() {
         gameState.getPlayerHand().clear();
-        List<PlayingCard> cards = gameState.getGameDeck().draw(10);
+        List<PlayingCard> cards = gameState.getGameDeck().draw(8);
         gameState.getPlayerHand().addAll(cards);
     }
     
