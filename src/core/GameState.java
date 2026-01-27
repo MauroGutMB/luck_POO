@@ -16,7 +16,8 @@ public class GameState {
     private Deck gameDeck;
     private List<PlayingCard> playerHand;
     private List<PlayingCard> selectedCards;
-    private PokerHand requiredHand; // Mão mínima necessária
+    private PokerHand requiredHand; // Mão mínima sugerida
+    private int targetMoney; // Dinheiro necessário para avançar
     
     public GameState() {
         this.score = 0;
@@ -29,6 +30,7 @@ public class GameState {
         this.playerHand = new ArrayList<>();
         this.selectedCards = new ArrayList<>();
         this.requiredHand = PokerHand.PAIR;
+        this.targetMoney = 20;
     }
     
     public void reset() {
@@ -42,6 +44,7 @@ public class GameState {
         playerHand.clear();
         selectedCards.clear();
         requiredHand = PokerHand.PAIR;
+        targetMoney = 20;
     }
     
     public void startNewRound() {
@@ -51,7 +54,7 @@ public class GameState {
         discards = 5;
         playerHand.clear();
         selectedCards.clear();
-        updateRequiredHand();
+        updateRoundGoals();
     }
     
     public void nextBlind() {
@@ -60,16 +63,37 @@ public class GameState {
         selectedCards.clear();
     }
     
-    private void updateRequiredHand() {
-        // Define mão necessária baseada na rodada
+    private void updateRoundGoals() {
+        // Define mão necessária baseada na rodada e meta de dinheiro
         switch (currentRound) {
-            case 1: requiredHand = PokerHand.PAIR; break;
-            case 2: requiredHand = PokerHand.PAIR; break;
-            case 3: requiredHand = PokerHand.TWO_PAIR; break;
-            case 4: requiredHand = PokerHand.THREE_OF_KIND; break;
-            case 5: requiredHand = PokerHand.FLUSH; break;
-            case 6: requiredHand = PokerHand.FULL_HOUSE; break;
-            default: requiredHand = PokerHand.FULL_HOUSE; break;
+            case 1: 
+                requiredHand = PokerHand.PAIR;
+                targetMoney = 20;
+                break;
+            case 2:
+                requiredHand = PokerHand.TWO_PAIR; 
+                targetMoney = 50;
+                break;
+            case 3: 
+                requiredHand = PokerHand.THREE_OF_KIND; 
+                targetMoney = 150;
+                break;
+            case 4: 
+                requiredHand = PokerHand.FLUSH; 
+                targetMoney = 500;
+                break;
+            case 5: 
+                requiredHand = PokerHand.FULL_HOUSE; 
+                targetMoney = 2000;
+                break;
+            case 6: 
+                requiredHand = PokerHand.FOUR_OF_KIND; 
+                targetMoney = 10000;
+                break;
+            default: 
+                requiredHand = PokerHand.ROYAL_FLUSH; 
+                targetMoney = (int)(targetMoney * 2.5);
+                break;
         }
     }
     
@@ -81,11 +105,11 @@ public class GameState {
     public int getCurrentRound() { return currentRound; }
     public void setCurrentRound(int round) { 
         this.currentRound = round;
-        updateRequiredHand();
+        updateRoundGoals();
     }
     public void nextRound() { 
         this.currentRound++;
-        updateRequiredHand();
+        updateRoundGoals();
     }
     
     public int getCurrentBlind() { return currentBlind; }
@@ -98,6 +122,9 @@ public class GameState {
     public int getMoney() { return money; }
     public void setMoney(int money) { this.money = money; }
     public void addMoney(int amount) { this.money += amount; }
+    
+    public int getTargetMoney() { return targetMoney; }
+    public void setTargetMoney(int targetMoney) { this.targetMoney = targetMoney; }
     
     public int getDiscards() { return discards; }
     public void setDiscards(int discards) { this.discards = discards; }

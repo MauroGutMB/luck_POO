@@ -2,6 +2,9 @@
 ## Aluno: Mauro Gutemberg Magalhães Barros  
 ## Análise e Desenvolvimento de sistemas; Módulo 2  
 
+ javac -d bin -sourcepath src .\src\Main.java
+ java .\src\Main.java
+
 ## Funcionalidades
 
 ### Menus
@@ -27,8 +30,7 @@
 - Cada mão de pôquer soma ao **multiplicador de dinheiro** do jogador.  
   - O multiplicador é aplicado ao dinheiro **ao final da 3ª aposta**.  
 - O jogador inciará cada aposta com 5 descartes, podendo descartar até 5 cartas.  
-  - O jogo poderá acabar caso o deck de 52 cartas se esvazie durante uma rodada.  
-- Para avançar, o jogador **não pode** encerrar um round com o multiplicador ≤ **1.5x**.  
+  - O jogo poderá acabar caso o deck de 52 cartas se esvazie durante uma rodada. 
 - O jogador pode escolher **rodar um dado de 6 lados**:  
   - O número sorteado = quantidade de balas do revólver (**b/6**).  
   - O revólver pode **aumentar** o multiplicador de acordo com a probabilidade.  

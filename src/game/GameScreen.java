@@ -196,13 +196,14 @@ public class GameScreen extends Screen {
     }
     
     private void endRound() {
-        if (gameState.getMultiplier() <= 1.5) {
+        int projectedMoney = (int) (gameState.getMoney() * gameState.getMultiplier());
+        
+        if (projectedMoney < gameState.getTargetMoney()) {
             showGameOverScreen();
             return;
         }
         
-        int earnings = (int) (gameState.getMoney() * gameState.getMultiplier());
-        gameState.setMoney(earnings);
+        gameState.setMoney(projectedMoney);
         
         showRoundCompleteScreen();
     }
@@ -234,19 +235,20 @@ public class GameScreen extends Screen {
         titleLabel.setBounds(250, 150, 500, 80);
         overlay.add(titleLabel);
         
-        // Multiplicador
-        JLabel multLabel = new JLabel("Multiplicador: " + String.format("%.1f", gameState.getMultiplier()) + "x", SwingConstants.CENTER);
-        multLabel.setFont(new Font("Arial", Font.BOLD, 28));
-        multLabel.setForeground(new Color(255, 223, 0));
-        multLabel.setBounds(250, 260, 500, 40);
-        overlay.add(multLabel);
+        // Resultado Final
+        int finalMoney = (int) (gameState.getMoney() * gameState.getMultiplier());
+        JLabel scoreLabel = new JLabel("Dinheiro Alcançado: $" + formatValue(finalMoney), SwingConstants.CENTER);
+        scoreLabel.setFont(new Font("Arial", Font.BOLD, 28));
+        scoreLabel.setForeground(new Color(255, 223, 0));
+        scoreLabel.setBounds(200, 260, 600, 40);
+        overlay.add(scoreLabel);
         
-        // Mínimo necessário
-        JLabel minLabel = new JLabel("Mínimo necessário: 1.5x", SwingConstants.CENTER);
-        minLabel.setFont(new Font("Arial", Font.PLAIN, 24));
-        minLabel.setForeground(Color.WHITE);
-        minLabel.setBounds(250, 310, 500, 40);
-        overlay.add(minLabel);
+        // Meta
+        JLabel targetLabel = new JLabel("Meta Necessária: $" + formatValue(gameState.getTargetMoney()), SwingConstants.CENTER);
+        targetLabel.setFont(new Font("Arial", Font.PLAIN, 24));
+        targetLabel.setForeground(Color.WHITE);
+        targetLabel.setBounds(200, 310, 600, 40);
+        overlay.add(targetLabel);
         
         // Botão menu
         JButton menuButton = createStyledButton("MENU", 410, 420);
@@ -293,7 +295,7 @@ public class GameScreen extends Screen {
         overlay.add(multLabel);
         
         // Dinheiro
-        JLabel moneyLabel = new JLabel("Dinheiro: $" + gameState.getMoney(), SwingConstants.CENTER);
+        JLabel moneyLabel = new JLabel("Dinheiro: $" + formatValue(gameState.getMoney()), SwingConstants.CENTER);
         moneyLabel.setFont(new Font("Arial", Font.BOLD, 32));
         moneyLabel.setForeground(new Color(100, 255, 100));
         moneyLabel.setBounds(200, 280, 600, 50);
@@ -357,52 +359,85 @@ public class GameScreen extends Screen {
         removeAll();
         setLayout(null);
         
-        // Overlay escuro
+        // Overlay com desenho customizado
         JPanel overlay = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                // Fundo escuro
                 if (backgroundImage != null) {
                     g2.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), this);
                 }
-                g2.setColor(new Color(0, 0, 0, 180));
+                g2.setColor(new Color(0, 0, 0, 200));
                 g2.fillRect(0, 0, getWidth(), getHeight());
+                
+                // Caixa central
+                int boxW = 500;
+                int boxH = 400;
+                int boxX = (getWidth() - boxW) / 2;
+                int boxY = (getHeight() - boxH) / 2;
+                
+                // Sombra da caixa
+                g2.setColor(new Color(0, 0, 0, 100));
+                g2.fillRoundRect(boxX + 10, boxY + 10, boxW, boxH, 30, 30);
+                
+                // Fundo da caixa
+                GradientPaint bgPaint = new GradientPaint(boxX, boxY, new Color(40, 40, 60), boxX, boxY + boxH, new Color(20, 20, 30));
+                g2.setPaint(bgPaint);
+                g2.fillRoundRect(boxX, boxY, boxW, boxH, 30, 30);
+                
+                // Borda da caixa
+                g2.setColor(new Color(100, 100, 150));
+                g2.setStroke(new BasicStroke(3));
+                g2.drawRoundRect(boxX, boxY, boxW, boxH, 30, 30);
+                
+                // Título "MÃO JOGADA"
+                g2.setColor(new Color(150, 200, 255));
+                g2.setFont(new Font("Arial", Font.BOLD, 20));
+                String title = "MÃO JOGADA";
+                int titleW = g2.getFontMetrics().stringWidth(title);
+                g2.drawString(title, boxX + (boxW - titleW) / 2, boxY + 50);
+                
+                // Nome da mão (ex: DOIS PARES)
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Arial", Font.BOLD, 40));
+                String handName = hand.getName().toUpperCase();
+                int handW = g2.getFontMetrics().stringWidth(handName);
+                g2.drawString(handName, boxX + (boxW - handW) / 2, boxY + 110);
+                
+                // Divisória
+                g2.setColor(new Color(255, 255, 255, 50));
+                g2.drawLine(boxX + 50, boxY + 150, boxX + boxW - 50, boxY + 150);
+                
+                // Multiplicador
+                g2.setFont(new Font("Arial", Font.PLAIN, 24));
+                g2.setColor(new Color(200, 200, 200));
+                String multText = "Bônus: ";
+                int multLabelW = g2.getFontMetrics().stringWidth(multText);
+                g2.drawString(multText, boxX + 150, boxY + 200);
+                
+                g2.setFont(new Font("Arial", Font.BOLD, 30));
+                g2.setColor(new Color(100, 255, 100));
+                String multValue = "+" + String.format("%.1f", handMultiplier) + "x";
+                g2.drawString(multValue, boxX + 150 + multLabelW, boxY + 200);
+                
+                // Novo Total
+                g2.setFont(new Font("Arial", Font.BOLD, 24));
+                g2.setColor(new Color(255, 223, 0));
+                String totalText = "Total Atual: " + String.format("%.1f", gameState.getMultiplier()) + "x";
+                int totalW = g2.getFontMetrics().stringWidth(totalText);
+                g2.drawString(totalText, boxX + (boxW - totalW) / 2, boxY + 260);
+                
                 g2.dispose();
             }
         };
         overlay.setBounds(0, 0, 1000, 700);
         overlay.setLayout(null);
         
-        // Título
-        JLabel titleLabel = new JLabel("RESULTADO", SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 50));
-        titleLabel.setForeground(new Color(255, 223, 0));
-        titleLabel.setBounds(200, 120, 600, 70);
-        overlay.add(titleLabel);
-        
-        // Mão jogada
-        JLabel handLabel = new JLabel("Você jogou: " + hand.getName(), SwingConstants.CENTER);
-        handLabel.setFont(new Font("Arial", Font.BOLD, 32));
-        handLabel.setForeground(Color.WHITE);
-        handLabel.setBounds(200, 220, 600, 50);
-        overlay.add(handLabel);
-        
-        // Multiplicador adicionado
-        JLabel multLabel = new JLabel("Multiplicador: +" + handMultiplier + "x", SwingConstants.CENTER);
-        multLabel.setFont(new Font("Arial", Font.BOLD, 28));
-        multLabel.setForeground(new Color(100, 255, 100));
-        multLabel.setBounds(200, 280, 600, 50);
-        overlay.add(multLabel);
-        
-        // Total
-        JLabel totalLabel = new JLabel("Total: " + String.format("%.1f", gameState.getMultiplier()) + "x", SwingConstants.CENTER);
-        totalLabel.setFont(new Font("Arial", Font.BOLD, 28));
-        totalLabel.setForeground(new Color(255, 223, 0));
-        totalLabel.setBounds(200, 330, 600, 50);
-        overlay.add(totalLabel);
-        
-        // Botão continuar
-        JButton continueButton = createStyledButton("CONTINUAR", 410, 430);
+        // Botão continuar (centralizado na parte inferior da caixa)
+        JButton continueButton = createStyledButton("CONTINUAR", 400, 530);
         continueButton.addActionListener(e -> {
             if (gameState.getCurrentBlind() < 3) {
                 gameState.nextBlind();
@@ -461,40 +496,184 @@ public class GameScreen extends Screen {
     @Override
     protected void render(Graphics2D g) {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         
-        // Recalcula áreas das cartas se necessário (primeira renderização)
+        // Recalcula áreas das cartas se necessário
         if (cardAreas.isEmpty() && !gameState.getPlayerHand().isEmpty()) {
             updateCardAreas();
         }
         
         if (backgroundImage != null) {
             g.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), this);
+        } else {
+            // Fundo gradiente caso a imagem falhe
+            GradientPaint bgGradient = new GradientPaint(0, 0, new Color(20, 40, 60), 0, getHeight(), new Color(10, 20, 30));
+            g.setPaint(bgGradient);
+            g.fillRect(0, 0, getWidth(), getHeight());
         }
         
-        g.setColor(new Color(0, 0, 0, 150));
-        g.fillRect(50, 80, 180, 120);
+        // --- Painel Esquerdo (Status) ---
+        drawStatusPanel(g, 30, 30);
         
-        g.setColor(new Color(255, 223, 0));
-        g.setFont(new Font("Arial", Font.BOLD, 16));
-        g.drawString("Round: " + gameState.getCurrentRound(), 70, 110);
-        g.drawString("Blind: " + gameState.getCurrentBlind() + "/3", 70, 135);
-        g.drawString("Descartes: " + gameState.getDiscards(), 70, 160);
-        g.drawString("Multi: " + String.format("%.1f", gameState.getMultiplier()) + "x", 70, 185);
+        // --- Painel Central (Mão Necessária) ---
+        drawRequiredHandPanel(g);
         
-        g.setColor(new Color(0, 0, 0, 150));
-        g.fillRect(320, 100, 360, 100);
-        
-        g.setColor(new Color(255, 223, 0));
-        g.setFont(new Font("Arial", Font.BOLD, 20));
-        g.drawString("Mão Necessária:", 380, 130);
-        g.setFont(new Font("Arial", Font.BOLD, 24));
-        g.drawString(gameState.getRequiredHand().getName(), 380, 165);
-        
-        g.setColor(new Color(255, 223, 0));
-        g.setFont(new Font("Arial", Font.BOLD, 20));
-        g.drawString("$" + gameState.getMoney(), 800, 50);
+        // --- Painel Direito (Dinheiro) ---
+        drawMoneyPanel(g);
         
         drawPlayerHand(g);
+    }
+
+    private String formatValue(double value) {
+        if (Math.abs(value) >= 1_000_000) {
+            return String.format("%.2e", value);
+        }
+        if (value == (long) value) {
+            return String.valueOf((long) value);
+        }
+        return String.format("%.1f", value);
+    }
+
+    private void drawStatusPanel(Graphics2D g, int x, int y) {
+        int width = 200;
+        int height = 160;
+        
+        // Fundo do painel
+        g.setColor(new Color(0, 0, 0, 180));
+        g.fillRoundRect(x, y, width, height, 15, 15);
+        g.setColor(new Color(100, 150, 200));
+        g.setStroke(new BasicStroke(2));
+        g.drawRoundRect(x, y, width, height, 15, 15);
+        
+        // Título estilizado
+        g.setColor(new Color(200, 220, 255));
+        g.setFont(new Font("Arial", Font.BOLD, 14));
+        g.drawString("ESTATÍSTICAS DA RODADA", x + 15, y + 25);
+        
+        // Linha divisória
+        g.setColor(new Color(100, 150, 200, 100));
+        g.drawLine(x + 10, y + 35, x + width - 10, y + 35);
+        
+        // Itens
+        int startY = y + 55;
+        int gap = 25;
+        
+        drawStatItem(g, "Round:", String.valueOf(gameState.getCurrentRound()), x + 15, startY);
+        drawStatItem(g, "Blind:", gameState.getCurrentBlind() + "/3", x + 15, startY + gap);
+        drawStatItem(g, "Descartes:", String.valueOf(gameState.getDiscards()), x + 15, startY + gap * 2);
+        
+        // Multiplicador com destaque
+        g.setFont(new Font("Arial", Font.BOLD, 16));
+        g.setColor(new Color(200, 200, 200));
+        g.drawString("Multi:", x + 15, startY + gap * 3 + 2);
+        
+        g.setFont(new Font("Arial", Font.BOLD, 18));
+        g.setColor(new Color(255, 223, 0));
+        g.drawString(formatValue(gameState.getMultiplier()) + "x", x + 110, startY + gap * 3 + 2);
+    }
+    
+    private void drawStatItem(Graphics2D g, String label, String value, int x, int y) {
+        g.setFont(new Font("Arial", Font.BOLD, 15));
+        g.setColor(new Color(180, 180, 180));
+        g.drawString(label, x, y);
+        g.setColor(Color.WHITE);
+        g.drawString(value, x + 110, y);
+    }
+
+    private void drawRequiredHandPanel(Graphics2D g) {
+        int width = 360;
+        int height = 90;
+        int x = (getWidth() - width) / 2;
+        int y = 30;
+        
+        // Sombra suave
+        g.setColor(new Color(0, 0, 0, 100));
+        g.fillRoundRect(x + 5, y + 5, width, height, 20, 20);
+        
+        // Gradiente de fundo
+        GradientPaint gradient = new GradientPaint(x, y, new Color(40, 30, 60, 230), x, y + height, new Color(20, 15, 30, 230));
+        g.setPaint(gradient);
+        g.fillRoundRect(x, y, width, height, 20, 20);
+        
+        // Borda brilhante indicando status da meta
+        int currentProjected = (int)(gameState.getMoney() * gameState.getMultiplier());
+        boolean isReached = currentProjected >= gameState.getTargetMoney();
+        
+        if (isReached) {
+            g.setColor(new Color(100, 255, 100)); // Verde se garantiu
+        } else {
+            g.setColor(new Color(255, 100, 100)); // Vermelho se ainda não
+        }
+        g.setStroke(new BasicStroke(2));
+        g.drawRoundRect(x, y, width, height, 20, 20);
+        
+        // Label "META DA RODADA"
+        g.setColor(new Color(200, 200, 200));
+        g.setFont(new Font("Arial", Font.BOLD, 12));
+        String label = "META DA RODADA";
+        g.drawString(label, x + 20, y + 25);
+        
+        // Valor da Meta ($)
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Arial", Font.BOLD, 36));
+        String targetText = "$" + formatValue(gameState.getTargetMoney());
+        FontMetrics fmTarget = g.getFontMetrics();
+        // Ajusta fonte se for muito grande
+        if (fmTarget.stringWidth(targetText) > 130) {
+            g.setFont(new Font("Arial", Font.BOLD, 28));
+        }
+        g.drawString(targetText, x + 20, y + 65);
+        
+        // Separador vertical
+        g.setColor(new Color(255, 255, 255, 50));
+        g.drawLine(x + 160, y + 15, x + 160, y + 75);
+        
+        // Projeção atual
+        g.setFont(new Font("Arial", Font.PLAIN, 12));
+        g.setColor(new Color(180, 180, 180));
+        g.drawString("Mão sugerida:", x + 180, y + 25);
+        
+        g.setFont(new Font("Arial", Font.BOLD, 16));
+        g.setColor(new Color(255, 223, 0));
+        String handName = gameState.getRequiredHand().getName();
+        // Trunca se for muito longo
+        if (g.getFontMetrics().stringWidth(handName) > 170) {
+            handName = handName.substring(0, 12) + "...";
+        }
+        g.drawString(handName, x + 180, y + 45);
+        
+        // Dinheiro Projetado
+        g.setFont(new Font("Arial", Font.BOLD, 14));
+        if (isReached) g.setColor(new Color(100, 255, 100));
+        else g.setColor(new Color(255, 150, 150));
+        
+        g.drawString("Proj: $" + formatValue(currentProjected), x + 180, y + 70);
+    }
+
+    private void drawMoneyPanel(Graphics2D g) {
+        String moneyText = "$" + formatValue(gameState.getMoney());
+        g.setFont(new Font("Arial", Font.BOLD, 28));
+        FontMetrics fm = g.getFontMetrics();
+        
+        int textWidth = fm.stringWidth(moneyText);
+        int padding = 20;
+        int width = Math.max(textWidth + padding * 2, 100); // Garante largura mínima
+        int height = 50;
+        int x = getWidth() - width - 30;
+        int y = 30;
+        
+        // Fundo estilo etiqueta
+        g.setColor(new Color(20, 60, 20, 200));
+        g.fillRoundRect(x, y, width, height, 25, 25);
+        
+        g.setColor(new Color(50, 200, 50));
+        g.setStroke(new BasicStroke(2));
+        g.drawRoundRect(x, y, width, height, 25, 25);
+        
+        // Texto
+        g.setColor(new Color(100, 255, 100));
+        // Centraliza texto
+        g.drawString(moneyText, x + (width - textWidth) / 2, y + 35);
     }
     
     private void drawPlayerHand(Graphics2D g) {

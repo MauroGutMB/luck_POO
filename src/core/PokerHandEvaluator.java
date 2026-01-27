@@ -11,19 +11,20 @@ public class PokerHandEvaluator {
      * Avalia uma lista de cartas e retorna o melhor tipo de mão de pôquer
      */
     public static PokerHand evaluateHand(List<PlayingCard> cards) {
-        if (cards == null || cards.size() != 5) {
+        if (cards == null || cards.isEmpty()) {
             return PokerHand.HIGH_CARD;
         }
+        int cardCount = cards.size();
         
         // Ordena as cartas por valor
         List<PlayingCard> sortedCards = new ArrayList<>(cards);
         sortedCards.sort((a, b) -> Integer.compare(b.getRankEnum().getValue(), a.getRankEnum().getValue()));
         
-        boolean isFlush = checkFlush(sortedCards);
-        boolean isStraight = checkStraight(sortedCards);
+        boolean isFlush = cardCount == 5 && checkFlush(sortedCards);
+        boolean isStraight = cardCount == 5 && checkStraight(sortedCards);
         
         // Royal Flush
-        if (isFlush && isStraight && sortedCards.get(0).getRankEnum() == Rank.ACE) {
+        if (isFlush && isStraight && isRoyalSequence(sortedCards)) {
             return PokerHand.ROYAL_FLUSH;
         }
         
@@ -47,7 +48,7 @@ public class PokerHandEvaluator {
         }
         
         // Full House
-        if (counts.get(0) == 3 && counts.get(1) == 2) {
+        if (cardCount == 5 && counts.size() >= 2 && counts.get(0) == 3 && counts.get(1) == 2) {
             return PokerHand.FULL_HOUSE;
         }
         
@@ -67,7 +68,7 @@ public class PokerHandEvaluator {
         }
         
         // Two Pair
-        if (counts.get(0) == 2 && counts.get(1) == 2) {
+        if (counts.size() >= 2 && counts.get(0) == 2 && counts.get(1) == 2) {
             return PokerHand.TWO_PAIR;
         }
         
@@ -97,6 +98,9 @@ public class PokerHandEvaluator {
      * Verifica se as cartas formam uma sequência
      */
     private static boolean checkStraight(List<PlayingCard> cards) {
+        if (cards.size() != 5) {
+            return false;
+        }
         // Verifica sequência normal
         for (int i = 0; i < cards.size() - 1; i++) {
             if (cards.get(i).getRankEnum().getValue() - cards.get(i + 1).getRankEnum().getValue() != 1) {
@@ -113,16 +117,28 @@ public class PokerHandEvaluator {
         }
         return true;
     }
+
+    /**
+     * Verifica se a sequência é 10-J-Q-K-A (Royal)
+     */
+    private static boolean isRoyalSequence(List<PlayingCard> cards) {
+        return cards.size() == 5 &&
+               cards.get(0).getRankEnum() == Rank.ACE &&
+               cards.get(1).getRankEnum() == Rank.KING &&
+               cards.get(2).getRankEnum() == Rank.QUEEN &&
+               cards.get(3).getRankEnum() == Rank.JACK &&
+               cards.get(4).getRankEnum() == Rank.TEN;
+    }
     
     /**
      * Encontra a melhor mão de 5 cartas dentro de uma lista maior
      */
     public static PokerHand evaluateBestHand(List<PlayingCard> cards) {
-        if (cards == null || cards.size() < 5) {
+        if (cards == null || cards.isEmpty()) {
             return PokerHand.HIGH_CARD;
         }
         
-        if (cards.size() == 5) {
+        if (cards.size() <= 5) {
             return evaluateHand(cards);
         }
         
