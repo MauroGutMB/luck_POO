@@ -1,6 +1,9 @@
 # Trabalho final - Programação Orientada a Objetos  
-## Aluno: Mauro Gutemberg Magalhães Barros  
-## Análise e Desenvolvimento de sistemas; Módulo 2  
+### Aluno: Mauro Gutemberg Magalhães Barros  
+### Professor: Renê Douglas Morais  
+### Análise e Desenvolvimento de sistemas; Módulo 2  
+
+--- 
 
  javac -d bin -sourcepath src .\src\Main.java
  java .\src\Main.java
