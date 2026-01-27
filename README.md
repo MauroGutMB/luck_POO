@@ -1,5 +1,6 @@
 # Trabalho final - Programação Orientada a Objetos  
 ## Aluno: Mauro Gutemberg Magalhães Barros  
+## Professor: Renê Douglas Morais  
 ## Análise e Desenvolvimento de sistemas; Módulo 2  
 
 ## Funcionalidades
