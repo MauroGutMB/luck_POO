@@ -10,7 +10,7 @@ import java.util.Random;
 public class GameState {
     private int score;
     private int currentRound;
-    private int currentBlind; // 1, 2 ou 3
+    private int currentBlind;
     private double multiplier;
     private int money;
     private int discards;
@@ -29,7 +29,7 @@ public class GameState {
         this.currentBlind = 1;
         this.multiplier = 1.0;
         this.money = 10; // Dinheiro inicial
-        this.discards = 5;
+        this.discards = this.currentRound + 4;
         this.handsPlayed = 0;
         this.gameDeck = new Deck();
         this.playerHand = new ArrayList<>();
@@ -44,7 +44,7 @@ public class GameState {
         currentBlind = 1;
         multiplier = 1.0;
         money = 10;
-        discards = 5;
+        discards = Math.min(currentRound + 4, 10);
         handsPlayed = 0;
         gameDeck.reset();
         playerHand.clear();
@@ -57,7 +57,6 @@ public class GameState {
         gameDeck.reset();
         currentBlind = 1;
         multiplier = 1.0;
-        discards = 5;
         handsPlayed = 0;
         playerHand.clear();
         selectedCards.clear();
@@ -69,38 +68,40 @@ public class GameState {
         handsPlayed = 0;
         playerHand.clear();
         selectedCards.clear();
+        updateRoundGoals();
     }
     
     private void updateRoundGoals() {
-        // Define mão necessária baseada na rodada e meta de dinheiro
+        // Define mão necessária baseada na rodada (aleatória por blind) e meta de dinheiro
+        discards = currentRound + 4;
         switch (currentRound) {
             case 1: 
                 requiredHand = PokerHand.PAIR;
-                targetMoney = 20;
+                targetMoney = 25;
                 break;
             case 2:
                 requiredHand = randomHand(PokerHand.TWO_PAIR, PokerHand.PAIR);
-                targetMoney = 50;
+                targetMoney = 75;
                 break;
             case 3: 
                 requiredHand = randomHand(PokerHand.THREE_OF_KIND, PokerHand.TWO_PAIR, PokerHand.PAIR);
-                targetMoney = 150;
+                targetMoney = 350;
                 break;
             case 4: 
                 requiredHand = randomHand(PokerHand.FLUSH, PokerHand.THREE_OF_KIND, PokerHand.TWO_PAIR, PokerHand.PAIR);
-                targetMoney = 500;
+                targetMoney = 800;
                 break;
             case 5: 
                 requiredHand = randomHand(PokerHand.FULL_HOUSE, PokerHand.FLUSH, PokerHand.THREE_OF_KIND, PokerHand.TWO_PAIR, PokerHand.PAIR);
-                targetMoney = 2000;
+                targetMoney = 2700;
                 break;
             case 6: 
                 requiredHand = randomHand(PokerHand.FOUR_OF_KIND, PokerHand.FULL_HOUSE, PokerHand.FLUSH, PokerHand.THREE_OF_KIND, PokerHand.TWO_PAIR, PokerHand.PAIR);
-                targetMoney = 10000;
+                targetMoney = 20000;
                 break;
             default: 
                 requiredHand = randomHand(PokerHand.ROYAL_FLUSH, PokerHand.FOUR_OF_KIND, PokerHand.FULL_HOUSE, PokerHand.FLUSH, PokerHand.THREE_OF_KIND);
-                targetMoney = 50000;
+                targetMoney = (int)(this.money * 1.5 * currentRound);
                 break;
         }
     }

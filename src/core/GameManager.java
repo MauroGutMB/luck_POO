@@ -26,7 +26,6 @@ public class GameManager {
     public void startNewGame() {
         gameState.reset();
         gameState.startNewRound();
-        System.out.println("Novo jogo iniciado!");
     }
     
     /**
