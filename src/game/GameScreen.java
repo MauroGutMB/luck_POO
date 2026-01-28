@@ -23,11 +23,17 @@ public class GameScreen extends Screen {
     private JButton discardButton;
     private Point mousePos;
     
-    // Cutscene State
-    private boolean isRollingDice = false;
+    // Cutscene/Roulette State
+    private enum RouletteState { NONE, WARNING, ROLLING, RESULT }
+    private RouletteState rouletteState = RouletteState.NONE;
     private int diceAnimationFrame = 0;
     private int diceAnimationResult = 1;
     private Timer diceTimer;
+    private String rouletteResultText = "";
+    private boolean rouletteSuccess = false;
+    private JButton rouletteConfirmButton;
+    private JButton rouletteCancelButton;
+    private JButton rouletteContinueButton;
     
     public GameScreen(ScreenManager screenManager) {
         super(screenManager);
@@ -38,6 +44,47 @@ public class GameScreen extends Screen {
         this.cardAreas = new ArrayList<>();
         this.mousePos = new Point(0, 0);
         setupMouseListeners();
+        setupRouletteButtons();
+    }
+    
+    private void setupRouletteButtons() {
+        // Inicializa botões do overlay de roleta, mas não os adiciona ainda
+        rouletteConfirmButton = createActionButton("PUXAR GATILHO", 0, 0, new Color(142, 68, 173));
+        rouletteConfirmButton.addActionListener(e -> startDiceRollCutscene());
+        
+        rouletteCancelButton = createActionButton("CANCELAR", 0, 0, new Color(120, 120, 120));
+        rouletteCancelButton.addActionListener(e -> {
+            rouletteState = RouletteState.NONE;
+            setGameButtonsEnabled(true);
+            removeAll(); // Limpa botões antigos
+            add(playButton);
+            add(discardButton);
+            add(createActionButton("ROLETA", 230, 610, new Color(142, 68, 173))); // Recria botão
+            revalidate();
+            repaint();
+            initialize(); // Restaura controles padrão
+        });
+        
+        rouletteContinueButton = createActionButton("CONTINUAR", 0, 0, new Color(46, 204, 113));
+        rouletteContinueButton.addActionListener(e -> {
+            rouletteState = RouletteState.NONE;
+            if (rouletteSuccess) {
+                showRoundCompleteScreen();
+            } else {
+                showGameOverScreen();
+            }
+        });
+    }
+
+    private void setGameButtonsEnabled(boolean enabled) {
+        playButton.setEnabled(enabled);
+        discardButton.setEnabled(enabled);
+        // Desabilita visualmente se necessário, ou apenas lógica
+        for(Component c : getComponents()) {
+            if (c instanceof JButton && c != rouletteConfirmButton && c != rouletteCancelButton && c != rouletteContinueButton) {
+                c.setEnabled(enabled);
+            }
+        }
     }
     
     private void loadBackground() {
@@ -214,24 +261,13 @@ public class GameScreen extends Screen {
     }
 
     private void playRussianRoulette() {
-        int choice = JOptionPane.showConfirmDialog(
-            this,
-            "ROLETA RUSSA!\n" +
-            "Deseja rolar o dado para definir o número de balas?\n\n" +
-            "Risco: Se morrer, Fim de Jogo.\n" +
-            "Recompensa: Multiplicador aumenta drasticamente e vence a Blind.",
-            "Risco Extremo",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.WARNING_MESSAGE
-        );
-        
-        if (choice == JOptionPane.YES_OPTION) {
-            startDiceRollCutscene();
-        }
+        rouletteState = RouletteState.WARNING;
+        setGameButtonsEnabled(false);
+        repaint();
     }
 
     private void startDiceRollCutscene() {
-        isRollingDice = true;
+        rouletteState = RouletteState.ROLLING;
         diceAnimationFrame = 0;
         // Determine final result beforehand
         diceAnimationResult = (int) (Math.random() * 6) + 1; // 1 to 6
@@ -265,49 +301,35 @@ public class GameScreen extends Screen {
         // Pause briefly to show result
         Timer pause = new Timer(1000, e -> {
             ((Timer)e.getSource()).stop();
-            isRollingDice = false;
             resolveRussianRoulette(diceAnimationResult);
-            repaint();
         });
         pause.setRepeats(false);
         pause.start();
     }
     
     private void resolveRussianRoulette(int bullets) {
-         JOptionPane.showMessageDialog(this, 
-            "O dado rolou: " + bullets + " balas no tambor (de 6).\n" +
-            "Puxando o gatilho...", 
-            "Roleta Russa", 
-            JOptionPane.INFORMATION_MESSAGE
-        );
-
         // Spin the chamber
         int chamber = (int) (Math.random() * 6) + 1;
         
         if (chamber <= bullets) {
             // Morreu
-            JOptionPane.showMessageDialog(this, "BANG! Você morreu.", "Fim de Jogo", JOptionPane.ERROR_MESSAGE);
-            showGameOverScreen();
+            rouletteSuccess = false;
+            rouletteResultText = "BANG! O tambor parou na bala.";
         } else {
             // Sobreviveu
+            rouletteSuccess = true;
             double bonusFactor = Math.pow(bullets + 1, 2);
             gameState.setMultiplier(gameState.getMultiplier() * bonusFactor);
+            rouletteResultText = "CLICK! Sobreviveu. Bônus: " + (int)bonusFactor + "x!";
             
-            JOptionPane.showMessageDialog(this, 
-                "CLICK... Você sobreviveu!\n" +
-                "Multiplicador multiplicado por " + (int)bonusFactor + "x!\n" +
-                "Blind vencida automaticamente!", 
-                "Sorte Insana", 
-                JOptionPane.INFORMATION_MESSAGE
-            );
-            
-            // Vence a blind automaticamente independente do dinheiro
+            // Vence a blind automaticamente
             gameState.setMoney((int)(gameState.getMoney() * gameState.getMultiplier()));
             if (gameState.getMoney() < gameState.getTargetMoney()) {
-                 gameState.setMoney(gameState.getTargetMoney()); // Garante a meta
+                 gameState.setMoney(gameState.getTargetMoney());
             }
-            showRoundCompleteScreen();
         }
+        rouletteState = RouletteState.RESULT;
+        repaint();
     }
     
     private void discardCards() {
@@ -742,33 +764,122 @@ public class GameScreen extends Screen {
         
         drawPlayerHand(g);
         
-        if (isRollingDice) {
-            drawDiceCutscene(g);
+        if (rouletteState != RouletteState.NONE) {
+            drawRouletteOverlay(g);
         }
     }
 
-    private void drawDiceCutscene(Graphics2D g) {
+    private void drawRouletteOverlay(Graphics2D g) {
         // Overlay escuro
-        g.setColor(new Color(0, 0, 0, 200));
+        g.setColor(new Color(0, 0, 0, 220));
         g.fillRect(0, 0, getWidth(), getHeight());
         
-        // Título
-        g.setFont(new Font("Arial", Font.BOLD, 40));
-        g.setColor(new Color(142, 68, 173));
-        String text = "Rolando o dado...";
+        int cx = getWidth() / 2;
+        int cy = getHeight() / 2;
+        
+        if (rouletteState == RouletteState.WARNING) {
+            // Caixa de Aviso
+            g.setColor(new Color(50, 20, 20));
+            g.fillRoundRect(cx - 250, cy - 150, 500, 300, 20, 20);
+            g.setColor(new Color(200, 50, 50));
+            g.setStroke(new BasicStroke(3));
+            g.drawRoundRect(cx - 250, cy - 150, 500, 300, 20, 20);
+            
+            g.setFont(new Font("Arial", Font.BOLD, 36));
+            g.setColor(new Color(255, 80, 80));
+            drawCenteredText(g, "RISCO EXTREMO", cy - 100);
+            
+            g.setFont(new Font("Arial", Font.PLAIN, 18));
+            g.setColor(Color.WHITE);
+            drawCenteredText(g, "O dado definirá o número de balas no tambor.", cy - 50);
+            drawCenteredText(g, "Se morrer, FIM DE JOGO.", cy - 20);
+            drawCenteredText(g, "Se viver, MULTIPLICADOR INSANO e Vitória.", cy + 10);
+            
+            // Render Buttons manually since they are not in component hierarchy properly during overlay paint usually but here we added action listeners
+            // Let's manually position and draw them here, but we need to ensure they are added to layout or handled via mouse clicks.
+            // Since we're in custom render, we can just effectively draw them and rely on a click handler or add them as components.
+            // The cleanest way for "Screen" is adding components.
+            // But we need to update their positions.
+            
+            rouletteConfirmButton.setBounds(cx - 210, cy + 60, 200, 50);
+            rouletteCancelButton.setBounds(cx + 10, cy + 60, 200, 50);
+            
+            // "Paint" them by delegating
+            g.translate(rouletteConfirmButton.getX(), rouletteConfirmButton.getY());
+            rouletteConfirmButton.paint(g);
+            g.translate(-rouletteConfirmButton.getX(), -rouletteConfirmButton.getY());
+            
+            g.translate(rouletteCancelButton.getX(), rouletteCancelButton.getY());
+            rouletteCancelButton.paint(g);
+            g.translate(-rouletteCancelButton.getX(), -rouletteCancelButton.getY());
+            
+            // Add to component list if not there? 
+            // In swing, painting doesn't add interaction. 
+            // We should add them to the panel when entering state and remove when leaving.
+            if (rouletteConfirmButton.getParent() != this) {
+               add(rouletteConfirmButton);
+               add(rouletteCancelButton);
+               revalidate();
+            }
+
+        } else if (rouletteState == RouletteState.ROLLING) {
+            // Remove buttons if rolling
+             if (rouletteConfirmButton.getParent() == this) {
+                remove(rouletteConfirmButton);
+                remove(rouletteCancelButton);
+                revalidate();
+            }
+
+            g.setFont(new Font("Arial", Font.BOLD, 40));
+            g.setColor(new Color(142, 68, 173));
+            drawCenteredText(g, "Rolando o dado...", cy - 100);
+            
+            // Desenha o dado no centro
+            int diceSize = 128;
+            g.setColor(new Color(142, 68, 173, 100)); // Roxo brilhante
+            g.fillOval(cx - diceSize/2 - 20, cy - diceSize/2 - 20, diceSize + 40, diceSize + 40);
+            diceRenderer.drawFace(g, diceAnimationFrame, cx - diceSize/2, cy - diceSize/2, diceSize, diceSize);
+            
+        } else if (rouletteState == RouletteState.RESULT) {
+             // Caixa de Resultado
+            Color bg = rouletteSuccess ? new Color(20, 50, 20) : new Color(50, 20, 20);
+            Color border = rouletteSuccess ? new Color(50, 200, 50) : new Color(200, 50, 50);
+            
+            g.setColor(bg);
+            g.fillRoundRect(cx - 250, cy - 150, 500, 300, 20, 20);
+            g.setColor(border);
+            g.setStroke(new BasicStroke(3));
+            g.drawRoundRect(cx - 250, cy - 150, 500, 300, 20, 20);
+            
+            g.setFont(new Font("Arial", Font.BOLD, 48));
+            g.setColor(rouletteSuccess ? new Color(100, 255, 100) : new Color(255, 50, 50));
+            drawCenteredText(g, rouletteSuccess ? "SOBREVIVEU!" : "GAME OVER", cy - 80);
+            
+            g.setFont(new Font("Arial", Font.BOLD, 24));
+            g.setColor(Color.WHITE);
+            drawCenteredText(g, rouletteResultText, cy);
+            
+            // Removemos o dado do resultado conforme solicitado
+            // int diceSize = 64;
+            // diceRenderer.drawFace(g, diceAnimationResult, cx - diceSize/2, cy - 160, diceSize, diceSize);
+
+            rouletteContinueButton.setBounds(cx - 100, cy + 80, 200, 50);
+            
+            g.translate(rouletteContinueButton.getX(), rouletteContinueButton.getY());
+            rouletteContinueButton.paint(g);
+            g.translate(-rouletteContinueButton.getX(), -rouletteContinueButton.getY());
+            
+            if (rouletteContinueButton.getParent() != this) {
+               add(rouletteContinueButton);
+               revalidate();
+            }
+        }
+    }
+    
+    private void drawCenteredText(Graphics2D g, String text, int y) {
         FontMetrics fm = g.getFontMetrics();
-        g.drawString(text, (getWidth() - fm.stringWidth(text)) / 2, 200);
-        
-        // Desenha o dado no centro
-        int diceSize = 128;
-        int x = (getWidth() - diceSize) / 2;
-        int y = (getHeight() - diceSize) / 2;
-        
-        // Efeito de brilho
-        g.setColor(new Color(142, 68, 173, 100)); // Roxo brilhante
-        g.fillOval(x - 20, y - 20, diceSize + 40, diceSize + 40);
-        
-        diceRenderer.drawFace(g, diceAnimationFrame, x, y, diceSize, diceSize);
+        int x = (getWidth() - fm.stringWidth(text)) / 2;
+        g.drawString(text, x, y);
     }
 
     private String formatValue(double value) {
