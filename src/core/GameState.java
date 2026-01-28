@@ -13,6 +13,8 @@ public class GameState {
     private double multiplier;
     private int money;
     private int discards;
+    private int handsPlayed;
+    private final int MAX_HANDS = 3;
     private Deck gameDeck;
     private List<PlayingCard> playerHand;
     private List<PlayingCard> selectedCards;
@@ -26,6 +28,7 @@ public class GameState {
         this.multiplier = 1.0;
         this.money = 10; // Dinheiro inicial
         this.discards = 5;
+        this.handsPlayed = 0;
         this.gameDeck = new Deck();
         this.playerHand = new ArrayList<>();
         this.selectedCards = new ArrayList<>();
@@ -40,6 +43,7 @@ public class GameState {
         multiplier = 1.0;
         money = 10;
         discards = 5;
+        handsPlayed = 0;
         gameDeck.reset();
         playerHand.clear();
         selectedCards.clear();
@@ -52,6 +56,7 @@ public class GameState {
         currentBlind = 1;
         multiplier = 1.0;
         discards = 5;
+        handsPlayed = 0;
         playerHand.clear();
         selectedCards.clear();
         updateRoundGoals();
@@ -59,6 +64,7 @@ public class GameState {
     
     public void nextBlind() {
         currentBlind++;
+        handsPlayed = 0;
         playerHand.clear();
         selectedCards.clear();
     }
@@ -129,6 +135,10 @@ public class GameState {
     public int getDiscards() { return discards; }
     public void setDiscards(int discards) { this.discards = discards; }
     public void decrementDiscards() { this.discards--; }
+
+    public int getHandsPlayed() { return handsPlayed; }
+    public void incrementHandsPlayed() { this.handsPlayed++; }
+    public int getMaxHands() { return MAX_HANDS; }
     
     public Deck getGameDeck() { return gameDeck; }
     public List<PlayingCard> getPlayerHand() { return playerHand; }

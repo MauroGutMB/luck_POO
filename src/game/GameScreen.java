@@ -162,12 +162,34 @@ public class GameScreen extends Screen {
             JOptionPane.showMessageDialog(this, "Selecione no máximo 5 cartas!", "Erro", JOptionPane.WARNING_MESSAGE);
             return;
         }
+
+        if (gameState.getHandsPlayed() >= gameState.getMaxHands()) {
+            JOptionPane.showMessageDialog(this, "Sem mãos restantes nesta blind!", "Erro", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
         
         PokerHand hand = PokerHandEvaluator.evaluateHand(gameState.getSelectedCards());
-        double handMultiplier = hand.getMultiplier();
-        gameState.addMultiplier(handMultiplier);
+        boolean isSuccess = hand.compareTo(gameState.getRequiredHand()) >= 0;
+
+        // Consome as cartas jogadas
+        gameState.getPlayerHand().removeAll(gameState.getSelectedCards());
+        gameState.getGameDeck().discard(gameState.getSelectedCards());
         
-        showHandResultScreen(hand, handMultiplier);
+        gameState.incrementHandsPlayed();
+        
+        double handMultiplier = 0;
+        if (isSuccess) {
+            handMultiplier = hand.getMultiplier();
+            gameState.addMultiplier(handMultiplier);
+        } else {
+            // Penalidade
+            double penalty = 0.2 * gameState.getCurrentRound();
+            gameState.addMultiplier(-penalty);
+            // Garante que não fique negativo (opcional, mas bom pra evitar bugs visuais extremos)
+            if (gameState.getMultiplier() < 0) gameState.setMultiplier(0);
+        }
+        
+        showHandResultScreen(hand, handMultiplier, isSuccess);
     }
     
     private void discardCards() {
@@ -187,11 +209,18 @@ public class GameScreen extends Screen {
         gameState.getGameDeck().discard(gameState.getSelectedCards());
         gameState.getSelectedCards().clear();
         
-        List<PlayingCard> newCards = gameState.getGameDeck().draw(discardCount);
-        if (newCards.size() < discardCount) {
-            JOptionPane.showMessageDialog(this, "Deck vazio! Fim da rodada.", "Aviso", JOptionPane.WARNING_MESSAGE);
+        // Preenche a mão até voltar a ter 8 cartas
+        int currentHandSize = gameState.getPlayerHand().size();
+        int cardsToDraw = 8 - currentHandSize;
+        
+        if (cardsToDraw > 0) {
+            List<PlayingCard> newCards = gameState.getGameDeck().draw(cardsToDraw);
+            if (newCards.size() < cardsToDraw) {
+                JOptionPane.showMessageDialog(this, "Deck quase vazio!", "Aviso", JOptionPane.WARNING_MESSAGE);
+            }
+            gameState.getPlayerHand().addAll(newCards);
         }
-        gameState.getPlayerHand().addAll(newCards);
+        
         gameState.decrementDiscards();
         
         initialize();
@@ -357,7 +386,7 @@ public class GameScreen extends Screen {
         return button;
     }
     
-    private void showHandResultScreen(PokerHand hand, double handMultiplier) {
+    private void showHandResultScreen(PokerHand hand, double handMultiplier, boolean isSuccess) {
         removeAll();
         setLayout(null);
         
@@ -385,20 +414,23 @@ public class GameScreen extends Screen {
                 g2.setColor(new Color(0, 0, 0, 100));
                 g2.fillRoundRect(boxX + 10, boxY + 10, boxW, boxH, 30, 30);
                 
-                // Fundo da caixa
-                GradientPaint bgPaint = new GradientPaint(boxX, boxY, new Color(40, 40, 60), boxX, boxY + boxH, new Color(20, 20, 30));
+                // Fundo da caixa dinâmico (verde se sucesso, vermelho se falha)
+                Color c1 = isSuccess ? new Color(40, 60, 40) : new Color(60, 40, 40);
+                Color c2 = isSuccess ? new Color(20, 30, 20) : new Color(30, 20, 20);
+                GradientPaint bgPaint = new GradientPaint(boxX, boxY, c1, boxX, boxY + boxH, c2);
+                
                 g2.setPaint(bgPaint);
                 g2.fillRoundRect(boxX, boxY, boxW, boxH, 30, 30);
                 
                 // Borda da caixa
-                g2.setColor(new Color(100, 100, 150));
+                g2.setColor(isSuccess ? new Color(100, 150, 100) : new Color(150, 100, 100));
                 g2.setStroke(new BasicStroke(3));
                 g2.drawRoundRect(boxX, boxY, boxW, boxH, 30, 30);
                 
-                // Título "MÃO JOGADA"
-                g2.setColor(new Color(150, 200, 255));
+                // Título
+                g2.setColor(isSuccess ? new Color(150, 255, 200) : new Color(255, 150, 150));
                 g2.setFont(new Font("Arial", Font.BOLD, 20));
-                String title = "MÃO JOGADA";
+                String title = isSuccess ? "MÃO JOGADA" : "MÃO INSUFICIENTE";
                 int titleW = g2.getFontMetrics().stringWidth(title);
                 g2.drawString(title, boxX + (boxW - titleW) / 2, boxY + 50);
                 
@@ -413,17 +445,38 @@ public class GameScreen extends Screen {
                 g2.setColor(new Color(255, 255, 255, 50));
                 g2.drawLine(boxX + 50, boxY + 150, boxX + boxW - 50, boxY + 150);
                 
-                // Multiplicador
-                g2.setFont(new Font("Arial", Font.PLAIN, 24));
-                g2.setColor(new Color(200, 200, 200));
-                String multText = "Bônus: ";
-                int multLabelW = g2.getFontMetrics().stringWidth(multText);
-                g2.drawString(multText, boxX + 150, boxY + 200);
-                
-                g2.setFont(new Font("Arial", Font.BOLD, 30));
-                g2.setColor(new Color(100, 255, 100));
-                String multValue = "+" + String.format("%.1f", handMultiplier) + "x";
-                g2.drawString(multValue, boxX + 150 + multLabelW, boxY + 200);
+                // Info
+                if (isSuccess) {
+                    // Multiplicador ganho
+                    g2.setFont(new Font("Arial", Font.PLAIN, 24));
+                    g2.setColor(new Color(200, 200, 200));
+                    String multText = "Bônus: ";
+                    int multLabelW = g2.getFontMetrics().stringWidth(multText);
+                    g2.drawString(multText, boxX + 150, boxY + 200);
+                    
+                    g2.setFont(new Font("Arial", Font.BOLD, 30));
+                    g2.setColor(new Color(100, 255, 100));
+                    String multValue = "+" + String.format("%.1f", handMultiplier) + "x";
+                    g2.drawString(multValue, boxX + 150 + multLabelW, boxY + 200);
+                } else {
+                    // Penalidade
+                    g2.setFont(new Font("Arial", Font.PLAIN, 24));
+                    g2.setColor(new Color(255, 150, 150));
+                    String penText = "Penalidade: ";
+                    int penLabelW = g2.getFontMetrics().stringWidth(penText);
+                    g2.drawString(penText, boxX + 130, boxY + 200);
+                    
+                    g2.setFont(new Font("Arial", Font.BOLD, 30));
+                    g2.setColor(Color.RED);
+                    String penValue = "-" + String.format("%.1f", 0.2 * gameState.getCurrentRound()) + "x";
+                    g2.drawString(penValue, boxX + 130 + penLabelW, boxY + 200);
+                    
+                    g2.setFont(new Font("Arial", Font.PLAIN, 18));
+                    g2.setColor(new Color(255, 200, 200));
+                    String reqText = "Necessário: " + gameState.getRequiredHand().getName();
+                    int reqW = g2.getFontMetrics().stringWidth(reqText);
+                    g2.drawString(reqText, boxX + (boxW - reqW) / 2, boxY + 235);
+                }
                 
                 // Novo Total
                 g2.setFont(new Font("Arial", Font.BOLD, 24));
@@ -438,15 +491,28 @@ public class GameScreen extends Screen {
         overlay.setBounds(0, 0, 1000, 700);
         overlay.setLayout(null);
         
+        boolean canTryAgain = !isSuccess && !gameState.getPlayerHand().isEmpty() && gameState.getHandsPlayed() < gameState.getMaxHands();
+        
         // Botão continuar (centralizado na parte inferior da caixa)
-        JButton continueButton = createStyledButton("CONTINUAR", 400, 530);
+        String btnText = isSuccess ? "CONTINUAR" : (canTryAgain ? "TENTAR NOVAMENTE" : "FIM DE JOGO");
+        JButton continueButton = createStyledButton(btnText, 400, 530);
         continueButton.addActionListener(e -> {
-            if (gameState.getCurrentBlind() < 3) {
-                gameState.nextBlind();
-                dealInitialHand();
-                initialize();
+            if (isSuccess) {
+                if (gameState.getCurrentBlind() < 3) {
+                    gameState.nextBlind();
+                    dealInitialHand();
+                    initialize();
+                } else {
+                    endRound();
+                }
             } else {
-                endRound();
+                if (canTryAgain) {
+                    // Tentar novamente: remove cartas selecionadas e redesenha (já removidas no playHand, só limpa seleção)
+                    gameState.getSelectedCards().clear();
+                    initialize();
+                } else {
+                    showGameOverScreen();
+                }
             }
         });
         overlay.add(continueButton);
@@ -569,7 +635,7 @@ public class GameScreen extends Screen {
 
     private void drawStatusPanel(Graphics2D g, int x, int y) {
         int width = 200;
-        int height = 160;
+        int height = 185;
         
         // Fundo do painel
         g.setColor(new Color(0, 0, 0, 180));
@@ -593,16 +659,17 @@ public class GameScreen extends Screen {
         
         drawStatItem(g, "Round:", String.valueOf(gameState.getCurrentRound()), x + 15, startY);
         drawStatItem(g, "Blind:", gameState.getCurrentBlind() + "/3", x + 15, startY + gap);
-        drawStatItem(g, "Descartes:", String.valueOf(gameState.getDiscards()), x + 15, startY + gap * 2);
+        drawStatItem(g, "Mãos:", (gameState.getMaxHands() - gameState.getHandsPlayed()) + "/" + gameState.getMaxHands(), x + 15, startY + gap * 2);
+        drawStatItem(g, "Descartes:", String.valueOf(gameState.getDiscards()), x + 15, startY + gap * 3);
         
         // Multiplicador com destaque
         g.setFont(new Font("Arial", Font.BOLD, 16));
         g.setColor(new Color(200, 200, 200));
-        g.drawString("Multi:", x + 15, startY + gap * 3 + 2);
+        g.drawString("Multi:", x + 15, startY + gap * 4 + 2);
         
         g.setFont(new Font("Arial", Font.BOLD, 18));
         g.setColor(new Color(255, 223, 0));
-        g.drawString(formatValue(gameState.getMultiplier()) + "x", x + 110, startY + gap * 3 + 2);
+        g.drawString(formatValue(gameState.getMultiplier()) + "x", x + 110, startY + gap * 4 + 2);
     }
     
     private void drawStatItem(Graphics2D g, String label, String value, int x, int y) {
@@ -664,7 +731,7 @@ public class GameScreen extends Screen {
         // Projeção atual
         g.setFont(new Font("Arial", Font.PLAIN, 12));
         g.setColor(new Color(180, 180, 180));
-        g.drawString("Mão sugerida:", x + 180, y + 25);
+        g.drawString("Mão mínima:", x + 180, y + 25);
         
         g.setFont(new Font("Arial", Font.BOLD, 16));
         g.setColor(new Color(255, 223, 0));
