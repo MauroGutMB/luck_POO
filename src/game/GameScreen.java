@@ -17,16 +17,24 @@ public class GameScreen extends Screen {
     private Image backgroundImage;
     private GameState gameState;
     private CardRenderer cardRenderer;
+    private DiceRenderer diceRenderer; // New renderer
     private List<Rectangle> cardAreas;
     private JButton playButton;
     private JButton discardButton;
     private Point mousePos;
+    
+    // Cutscene State
+    private boolean isRollingDice = false;
+    private int diceAnimationFrame = 0;
+    private int diceAnimationResult = 1;
+    private Timer diceTimer;
     
     public GameScreen(ScreenManager screenManager) {
         super(screenManager);
         loadBackground();
         this.gameState = GameManager.getInstance().getGameState();
         this.cardRenderer = CardRenderer.getInstance();
+        this.diceRenderer = DiceRenderer.getInstance(); // Initialize
         this.cardAreas = new ArrayList<>();
         this.mousePos = new Point(0, 0);
         setupMouseListeners();
@@ -98,13 +106,19 @@ public class GameScreen extends Screen {
         
         int buttonY = 610; // Posicionado abaixo das cartas (que terminam em ~580)
         
-        playButton = createActionButton("JOGAR", 340, buttonY, new Color(46, 204, 113)); // Emerald Green
+        playButton = createActionButton("JOGAR", 410, buttonY, new Color(46, 204, 113)); // Emerald Green
         playButton.addActionListener(e -> playHand());
         add(playButton);
         
-        discardButton = createActionButton("DESCARTAR", 520, buttonY, new Color(231, 76, 60)); // Alizarin Red
+        discardButton = createActionButton("DESCARTAR", 590, buttonY, new Color(231, 76, 60)); // Alizarin Red
         discardButton.addActionListener(e -> discardCards());
         add(discardButton);
+
+        // Botão Roleta Russa
+        JButton rouletteButton = createActionButton("ROLETA", 230, buttonY, new Color(142, 68, 173)); // Wisteria Purple
+        rouletteButton.addActionListener(e -> playRussianRoulette());
+        add(rouletteButton);
+
         
         revalidate();
         repaint();
@@ -197,6 +211,103 @@ public class GameScreen extends Screen {
         }
         
         showHandResultScreen(hand, handMultiplier, isSuccess);
+    }
+
+    private void playRussianRoulette() {
+        int choice = JOptionPane.showConfirmDialog(
+            this,
+            "ROLETA RUSSA!\n" +
+            "Deseja rolar o dado para definir o número de balas?\n\n" +
+            "Risco: Se morrer, Fim de Jogo.\n" +
+            "Recompensa: Multiplicador aumenta drasticamente e vence a Blind.",
+            "Risco Extremo",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.WARNING_MESSAGE
+        );
+        
+        if (choice == JOptionPane.YES_OPTION) {
+            startDiceRollCutscene();
+        }
+    }
+
+    private void startDiceRollCutscene() {
+        isRollingDice = true;
+        diceAnimationFrame = 0;
+        // Determine final result beforehand
+        diceAnimationResult = (int) (Math.random() * 6) + 1; // 1 to 6
+        
+        // Timer for animation
+        diceTimer = new Timer(50, new ActionListener() {
+            int frames = 0;
+            int maxFrames = 30; // ~1.5 seconds spin
+            
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                frames++;
+                // Random face during spin
+                diceAnimationFrame = (int)(Math.random() * 6) + 1;
+                repaint();
+                
+                if (frames >= maxFrames) {
+                    ((Timer)e.getSource()).stop();
+                    finishDiceRoll();
+                }
+            }
+        });
+        diceTimer.start();
+    }
+    
+    private void finishDiceRoll() {
+        // Show final result
+        diceAnimationFrame = diceAnimationResult;
+        repaint();
+        
+        // Pause briefly to show result
+        Timer pause = new Timer(1000, e -> {
+            ((Timer)e.getSource()).stop();
+            isRollingDice = false;
+            resolveRussianRoulette(diceAnimationResult);
+            repaint();
+        });
+        pause.setRepeats(false);
+        pause.start();
+    }
+    
+    private void resolveRussianRoulette(int bullets) {
+         JOptionPane.showMessageDialog(this, 
+            "O dado rolou: " + bullets + " balas no tambor (de 6).\n" +
+            "Puxando o gatilho...", 
+            "Roleta Russa", 
+            JOptionPane.INFORMATION_MESSAGE
+        );
+
+        // Spin the chamber
+        int chamber = (int) (Math.random() * 6) + 1;
+        
+        if (chamber <= bullets) {
+            // Morreu
+            JOptionPane.showMessageDialog(this, "BANG! Você morreu.", "Fim de Jogo", JOptionPane.ERROR_MESSAGE);
+            showGameOverScreen();
+        } else {
+            // Sobreviveu
+            double bonusFactor = Math.pow(bullets + 1, 2);
+            gameState.setMultiplier(gameState.getMultiplier() * bonusFactor);
+            
+            JOptionPane.showMessageDialog(this, 
+                "CLICK... Você sobreviveu!\n" +
+                "Multiplicador multiplicado por " + (int)bonusFactor + "x!\n" +
+                "Blind vencida automaticamente!", 
+                "Sorte Insana", 
+                JOptionPane.INFORMATION_MESSAGE
+            );
+            
+            // Vence a blind automaticamente independente do dinheiro
+            gameState.setMoney((int)(gameState.getMoney() * gameState.getMultiplier()));
+            if (gameState.getMoney() < gameState.getTargetMoney()) {
+                 gameState.setMoney(gameState.getTargetMoney()); // Garante a meta
+            }
+            showRoundCompleteScreen();
+        }
     }
     
     private void discardCards() {
@@ -630,6 +741,34 @@ public class GameScreen extends Screen {
         drawMoneyPanel(g);
         
         drawPlayerHand(g);
+        
+        if (isRollingDice) {
+            drawDiceCutscene(g);
+        }
+    }
+
+    private void drawDiceCutscene(Graphics2D g) {
+        // Overlay escuro
+        g.setColor(new Color(0, 0, 0, 200));
+        g.fillRect(0, 0, getWidth(), getHeight());
+        
+        // Título
+        g.setFont(new Font("Arial", Font.BOLD, 40));
+        g.setColor(new Color(142, 68, 173));
+        String text = "Rolando o dado...";
+        FontMetrics fm = g.getFontMetrics();
+        g.drawString(text, (getWidth() - fm.stringWidth(text)) / 2, 200);
+        
+        // Desenha o dado no centro
+        int diceSize = 128;
+        int x = (getWidth() - diceSize) / 2;
+        int y = (getHeight() - diceSize) / 2;
+        
+        // Efeito de brilho
+        g.setColor(new Color(142, 68, 173, 100)); // Roxo brilhante
+        g.fillOval(x - 20, y - 20, diceSize + 40, diceSize + 40);
+        
+        diceRenderer.drawFace(g, diceAnimationFrame, x, y, diceSize, diceSize);
     }
 
     private String formatValue(double value) {
