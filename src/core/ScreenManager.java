@@ -2,6 +2,7 @@ package core;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -13,9 +14,62 @@ public class ScreenManager {
     private Map<String, Screen> screens;
     private Screen currentScreen;
     
+    // Variáveis de transição
+    private JPanel overlayPanel;
+    private Timer transitionTimer;
+    private float alpha = 0.0f;
+    private String pendingScreenName;
+    private boolean isFadingOut = false;
+    private final float FADE_SPEED = 0.05f;
+    
     public ScreenManager(JFrame frame) {
         this.frame = frame;
         this.screens = new HashMap<>();
+        setupOverlay();
+    }
+    
+    private void setupOverlay() {
+        overlayPanel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                if (alpha > 0) {
+                    Graphics2D g2 = (Graphics2D) g;
+                    g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+                    g2.setColor(Color.BLACK);
+                    g2.fillRect(0, 0, getWidth(), getHeight());
+                }
+            }
+        };
+        overlayPanel.setOpaque(false);
+        overlayPanel.setVisible(false);
+        
+        // Bloqueia interações durante a transição
+        MouseAdapter blocker = new MouseAdapter() {};
+        overlayPanel.addMouseListener(blocker);
+        overlayPanel.addMouseMotionListener(blocker);
+        
+        frame.setGlassPane(overlayPanel);
+        
+        transitionTimer = new Timer(16, e -> updateTransition());
+    }
+    
+    private void updateTransition() {
+        if (isFadingOut) {
+            alpha += FADE_SPEED;
+            if (alpha >= 1.0f) {
+                alpha = 1.0f;
+                isFadingOut = false;
+                performScreenChange(pendingScreenName);
+            }
+        } else {
+            alpha -= FADE_SPEED;
+            if (alpha <= 0.0f) {
+                alpha = 0.0f;
+                transitionTimer.stop();
+                overlayPanel.setVisible(false);
+            }
+        }
+        overlayPanel.repaint();
     }
     
     /**
@@ -26,14 +80,27 @@ public class ScreenManager {
     }
     
     /**
-     * Muda para uma tela específica
+     * Muda para uma tela específica com transição
      */
     public void changeScreen(String name) {
-        Screen newScreen = screens.get(name);
-        if (newScreen == null) {
+        if (!screens.containsKey(name)) {
             System.err.println("Tela não encontrada: " + name);
             return;
         }
+        
+        if (currentScreen == null) {
+            performScreenChange(name);
+        } else {
+            pendingScreenName = name;
+            isFadingOut = true;
+            alpha = 0.0f;
+            overlayPanel.setVisible(true);
+            transitionTimer.start();
+        }
+    }
+    
+    private void performScreenChange(String name) {
+        Screen newScreen = screens.get(name);
         
         if (currentScreen != null) {
             frame.remove(currentScreen);

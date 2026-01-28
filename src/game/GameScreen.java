@@ -96,11 +96,13 @@ public class GameScreen extends Screen {
         
         updateCardAreas();
         
-        playButton = createActionButton("JOGAR", 400, 550);
+        int buttonY = 610; // Posicionado abaixo das cartas (que terminam em ~580)
+        
+        playButton = createActionButton("JOGAR", 340, buttonY, new Color(46, 204, 113)); // Emerald Green
         playButton.addActionListener(e -> playHand());
         add(playButton);
         
-        discardButton = createActionButton("DESCARTAR", 550, 550);
+        discardButton = createActionButton("DESCARTAR", 520, buttonY, new Color(231, 76, 60)); // Alizarin Red
         discardButton.addActionListener(e -> discardCards());
         add(discardButton);
         
@@ -454,37 +456,68 @@ public class GameScreen extends Screen {
         repaint();
     }
     
-    private JButton createActionButton(String text, int x, int y) {
+    private JButton createActionButton(String text, int x, int y, Color baseColor) {
         JButton button = new JButton(text) {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 
-                if (getModel().isRollover()) {
-                    g2.setColor(new Color(90, 140, 190, 230));
-                } else {
-                    g2.setColor(new Color(50, 90, 140, 210));
-                }
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                int w = getWidth();
+                int h = getHeight();
                 
-                g2.setStroke(new BasicStroke(2));
-                g2.setColor(new Color(255, 223, 0));
-                g2.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 10, 10);
+                // Shadow
+                g2.setColor(new Color(0, 0, 0, 80));
+                g2.fillRoundRect(3, 3, w - 3, h - 3, 20, 20);
+
+                // Variáveis de estado
+                Color c1 = baseColor;
+                Color c2 = baseColor.darker();
+                int yOffset = 0;
+                
+                if (getModel().isPressed()) {
+                    c1 = baseColor.darker();
+                    c2 = baseColor.darker().darker();
+                    yOffset = 2;
+                } else if (getModel().isRollover()) {
+                    c1 = baseColor.brighter();
+                    c2 = baseColor;
+                    yOffset = -1;
+                }
+                
+                // Botão principal
+                GradientPaint gp = new GradientPaint(0, 0, c1, 0, h, c2);
+                g2.setPaint(gp);
+                g2.fillRoundRect(0, yOffset, w - 3, h - 3, 20, 20);
+                
+                // Borda interna brilhante (efeito 3D)
+                g2.setStroke(new BasicStroke(1));
+                g2.setColor(new Color(255, 255, 255, 100));
+                g2.drawRoundRect(1, yOffset + 1, w - 5, h - 5, 18, 18);
+                
+                // Texto com sombra
+                g2.setFont(getFont());
+                FontMetrics fm = g2.getFontMetrics();
+                int textX = (w - 3 - fm.stringWidth(getText())) / 2;
+                int textY = (h - 3 + fm.getAscent() - fm.getDescent()) / 2 + yOffset;
+                
+                g2.setColor(new Color(0, 0, 0, 50));
+                g2.drawString(getText(), textX + 1, textY + 1);
+                
+                g2.setColor(Color.WHITE);
+                g2.drawString(getText(), textX, textY);
                 
                 g2.dispose();
-                super.paintComponent(g);
             }
         };
         
-        button.setBounds(x, y, 120, 45);
-        button.setFont(new Font("Arial", Font.BOLD, 16));
+        button.setBounds(x, y, 160, 50);
+        button.setFont(new Font("Arial", Font.BOLD, 18));
         button.setForeground(Color.WHITE);
         button.setFocusPainted(false);
         button.setBorderPainted(false);
         button.setContentAreaFilled(false);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        button.setOpaque(false);
         
         return button;
     }
