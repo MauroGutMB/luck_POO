@@ -547,7 +547,7 @@ public class GameScreen extends Screen {
         
         // Título estilizado
         g.setColor(new Color(200, 220, 255));
-        g.setFont(new Font("Arial", Font.BOLD, 14));
+        g.setFont(new Font("Arial", Font.BOLD, 12));
         g.drawString("ESTATÍSTICAS DA RODADA", x + 15, y + 25);
         
         // Linha divisória
