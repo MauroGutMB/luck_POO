@@ -15,6 +15,7 @@ import java.util.List;
  */
 public class GameScreen extends Screen {
     private Image backgroundImage;
+    private Image revolverImage;
     private GameState gameState;
     private CardRenderer cardRenderer;
     private DiceRenderer diceRenderer; // New renderer
@@ -24,10 +25,17 @@ public class GameScreen extends Screen {
     private Point mousePos;
     
     // Cutscene/Roulette State
-    private enum RouletteState { NONE, WARNING, ROLLING, RESULT }
+    private enum RouletteState { NONE, WARNING, ROLLING, LOADING, SPINNING, SHOOTING, FIRING, RESULT }
     private RouletteState rouletteState = RouletteState.NONE;
     private int diceAnimationFrame = 0;
     private int diceAnimationResult = 1;
+    // Animation vars
+    private int loadingBulletIndex = 0;
+    private double cylinderAngle = 0; // Angle for spinning animation
+    private int shootingFrame = 0;
+    private int firingFrame = 0; // Para animação de tiro
+    private boolean roundDied = false; // Armazena resultado temporariamente
+    private int finalChamberSlot = 0; // Slot que vai parar no gatilho (0-5)
     private Timer diceTimer;
     private String rouletteResultText = "";
     private boolean rouletteSuccess = false;
@@ -90,9 +98,9 @@ public class GameScreen extends Screen {
     private void loadBackground() {
         try {
             backgroundImage = ImageIO.read(new File("assets/bg-game.png"));
+            revolverImage = ImageIO.read(new File("assets/revolver.png"));
         } catch (IOException e) {
-            System.err.println("Erro ao carregar bg-game.png: " + e.getMessage());
-            backgroundImage = null;
+            System.err.println("Erro ao carregar assets: " + e.getMessage());
         }
     }
     
@@ -100,7 +108,9 @@ public class GameScreen extends Screen {
         addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                handleCardClick(e.getX(), e.getY());
+                if (rouletteState == RouletteState.NONE) {
+                    handleCardClick(e.getX(), e.getY());
+                }
             }
         });
         
@@ -298,29 +308,143 @@ public class GameScreen extends Screen {
         diceAnimationFrame = diceAnimationResult;
         repaint();
         
-        // Pause briefly to show result
+        // Pause briefly to show result then start loading bullets
         Timer pause = new Timer(1000, e -> {
             ((Timer)e.getSource()).stop();
-            resolveRussianRoulette(diceAnimationResult);
+            startLoadingCutscene();
         });
         pause.setRepeats(false);
         pause.start();
     }
     
-    private void resolveRussianRoulette(int bullets) {
-        // Spin the chamber
-        int chamber = (int) (Math.random() * 6) + 1;
+    private void startLoadingCutscene() {
+        rouletteState = RouletteState.LOADING;
+        loadingBulletIndex = 0;
         
-        if (chamber <= bullets) {
+        // Timer adding bullets one by one
+        Timer loadTimer = new Timer(500, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                loadingBulletIndex++;
+                repaint();
+                
+                if (loadingBulletIndex >= diceAnimationResult) {
+                     ((Timer)e.getSource()).stop();
+                     // Pause before spinning
+                     Timer pause = new Timer(500, ev -> {
+                         ((Timer)ev.getSource()).stop();
+                         startSpinningCutscene();
+                     });
+                     pause.setRepeats(false);
+                     pause.start();
+                }
+            }
+        });
+        loadTimer.start();
+    }
+
+    private void startSpinningCutscene() {
+        rouletteState = RouletteState.SPINNING;
+        
+        // Decidir resultado agora para alinhar visualmente com a lógica
+        // Slots 0 a (bullets-1) têm bala.
+        // Escolhemos um slot aleatório de 0 a 5 para ficar no topo (gatilho).
+        finalChamberSlot = (int)(Math.random() * 6);
+        
+        // Calcular angulo alvo para que o slot escolhido termine no topo (visual -90 graus)
+        double targetRotationForAlignment = (360 - (finalChamberSlot * 60)) % 360;
+        double totalRotation = 360 * 5 + targetRotationForAlignment; // 5 voltas completas + alinhamento
+        
+        long startTime = System.currentTimeMillis();
+        long duration = 2000; // 2 segundos de giro
+
+        // Timer spinning the chamber
+        Timer spinTimer = new Timer(16, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                long now = System.currentTimeMillis();
+                float progress = (float)(now - startTime) / duration;
+                
+                if (progress >= 1.0f) {
+                    progress = 1.0f;
+                    cylinderAngle = totalRotation;
+                    repaint();
+                    ((Timer)e.getSource()).stop();
+                    
+                    // Pausa muda mostrando o tambor alinhado antes do tiro
+                    Timer pause = new Timer(1000, ev -> {
+                        ((Timer)ev.getSource()).stop();
+                        startShootingCutscene();
+                    });
+                    pause.setRepeats(false);
+                    pause.start();
+                } else {
+                    // Ease-out
+                    float ease = 1 - (1 - progress) * (1 - progress) * (1 - progress); 
+                    cylinderAngle = totalRotation * ease;
+                    repaint();
+                }
+            }
+        });
+        spinTimer.start();
+    }
+
+    private void startShootingCutscene() {
+        rouletteState = RouletteState.SHOOTING;
+        shootingFrame = 0;
+        
+        // Shake animation timer
+        Timer shootTimer = new Timer(50, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                shootingFrame++;
+                repaint();
+                
+                if (shootingFrame > 20) { // ~1 second of tension
+                    ((Timer)e.getSource()).stop();
+                    resolveRussianRoulette();
+                }
+            }
+        });
+        shootTimer.start();
+    }
+    
+    private void resolveRussianRoulette() {
+        // Verificar se houve disparo baseado no slot que parou
+        // Slots 0 até diceAnimationResult-1 estão carregados.
+        roundDied = finalChamberSlot < diceAnimationResult;
+        
+        rouletteState = RouletteState.FIRING;
+        firingFrame = 0;
+        
+        // Timer da animação de disparo (Flash ou Click)
+        Timer fireTimer = new Timer(30, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                firingFrame++;
+                repaint();
+                
+                // Duração curta para o flash (ex: 15 frames = ~450ms)
+                if (firingFrame > 15) {
+                    ((Timer)e.getSource()).stop();
+                    finalizeRouletteResult();
+                }
+            }
+        });
+        fireTimer.start();
+    }
+
+    private void finalizeRouletteResult() {
+        if (roundDied) {
             // Morreu
             rouletteSuccess = false;
-            rouletteResultText = "BANG! O tambor parou na bala.";
+            rouletteResultText = "BANG! O tambor parou na bala (S" + (finalChamberSlot + 1) + ").";
         } else {
             // Sobreviveu
             rouletteSuccess = true;
-            double bonusFactor = Math.pow(bullets + 1, 2);
+            double bonusFactor = Math.pow(diceAnimationResult + 1, 2);
             gameState.setMultiplier(gameState.getMultiplier() * bonusFactor);
-            rouletteResultText = "CLICK! Sobreviveu. Bônus: " + (int)bonusFactor + "x!";
+            rouletteResultText = "CLICK! Sobreviveu. (S" + (finalChamberSlot + 1) + " Vazio). Bônus: " + (int)bonusFactor + "x!";
             
             // Vence a blind automaticamente
             gameState.setMoney((int)(gameState.getMoney() * gameState.getMultiplier()));
@@ -840,6 +964,165 @@ public class GameScreen extends Screen {
             g.fillOval(cx - diceSize/2 - 20, cy - diceSize/2 - 20, diceSize + 40, diceSize + 40);
             diceRenderer.drawFace(g, diceAnimationFrame, cx - diceSize/2, cy - diceSize/2, diceSize, diceSize);
             
+        } else if (rouletteState == RouletteState.LOADING) {
+             g.setFont(new Font("Arial", Font.BOLD, 40));
+             g.setColor(new Color(231, 76, 60));
+             drawCenteredText(g, "Carregando " + diceAnimationResult + " bala(s)...", cy - 200);
+             
+             // --- Desenho do Tambor (Cylinder) ---
+             int cylRadius = 120; // Raio do tambor
+             int holeDist = 70;   // Distância dos buracos ao centro
+             int holeRadius = 25; // Raio de cada buraco
+             
+             // Corpo do tambor
+             g.setColor(new Color(40, 40, 40));
+             g.fillOval(cx - cylRadius, cy - cylRadius, cylRadius * 2, cylRadius * 2);
+             g.setColor(new Color(20, 20, 20));
+             g.setStroke(new BasicStroke(5));
+             g.drawOval(cx - cylRadius, cy - cylRadius, cylRadius * 2, cylRadius * 2);
+             
+             // Eixo central
+             g.setColor(new Color(10, 10, 10));
+             g.fillOval(cx - 15, cy - 15, 30, 30);
+             
+             // Balas/Buracos
+             for (int i = 0; i < 6; i++) {
+                 double theta = Math.toRadians(i * 60 - 90); // -90 para começar do topo (12h)
+                 int hx = cx + (int)(Math.cos(theta) * holeDist);
+                 int hy = cy + (int)(Math.sin(theta) * holeDist);
+                 
+                 // Fundo do buraco
+                 g.setColor(Color.BLACK);
+                 g.fillOval(hx - holeRadius, hy - holeRadius, holeRadius * 2, holeRadius * 2);
+                 
+                 // Bala (se já foi carregada neste slot)
+                 if (i < loadingBulletIndex) {
+                     // Cartucho (Dourado)
+                     g.setColor(new Color(218, 165, 32)); 
+                     g.fillOval(hx - holeRadius + 2, hy - holeRadius + 2, holeRadius * 2 - 4, holeRadius * 2 - 4);
+                     // Espoleta (Prata/Cinza)
+                     g.setColor(new Color(180, 180, 180)); 
+                     g.fillOval(hx - 8, hy - 8, 16, 16);
+                     // Anel da espoleta
+                     g.setColor(new Color(150, 150, 150));
+                     g.setStroke(new BasicStroke(1));
+                     g.drawOval(hx - 8, hy - 8, 16, 16);
+                 }
+                 
+                 // Borda do buraco
+                 g.setColor(new Color(80, 80, 80));
+                 g.setStroke(new BasicStroke(2));
+                 g.drawOval(hx - holeRadius, hy - holeRadius, holeRadius * 2, holeRadius * 2);
+             }
+
+        } else if (rouletteState == RouletteState.SPINNING) {
+             // Texto ou Efeito de "Giro"
+             g.setFont(new Font("Arial", Font.BOLD, 40));
+             g.setColor(new Color(231, 76, 60));
+             drawCenteredText(g, "Girando Tambor...", cy - 200);
+             
+             int cylRadius = 120;
+             int holeDist = 70;
+             int holeRadius = 25;
+             
+             Graphics2D gSpin = (Graphics2D) g.create();
+             // Renderização de qualidade para rotação
+             gSpin.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+             gSpin.rotate(Math.toRadians(cylinderAngle), cx, cy); // Aplica rotação
+             
+             // Corpo
+             gSpin.setColor(new Color(40, 40, 40));
+             gSpin.fillOval(cx - cylRadius, cy - cylRadius, cylRadius * 2, cylRadius * 2);
+             gSpin.setColor(new Color(20, 20, 20));
+             gSpin.setStroke(new BasicStroke(5));
+             gSpin.drawOval(cx - cylRadius, cy - cylRadius, cylRadius * 2, cylRadius * 2);
+             
+             // Eixo
+             gSpin.setColor(new Color(10, 10, 10));
+             gSpin.fillOval(cx - 15, cy - 15, 30, 30);
+             
+             for (int i = 0; i < 6; i++) {
+                 double theta = Math.toRadians(i * 60 - 90);
+                 int hx = cx + (int)(Math.cos(theta) * holeDist);
+                 int hy = cy + (int)(Math.sin(theta) * holeDist);
+                 
+                 gSpin.setColor(Color.BLACK);
+                 gSpin.fillOval(hx - holeRadius, hy - holeRadius, holeRadius * 2, holeRadius * 2);
+                 
+                 // Desenha todas as balas carregadas
+                 if (i < diceAnimationResult) {
+                     gSpin.setColor(new Color(218, 165, 32));
+                     gSpin.fillOval(hx - holeRadius + 2, hy - holeRadius + 2, holeRadius * 2 - 4, holeRadius * 2 - 4);
+                     gSpin.setColor(new Color(180, 180, 180)); 
+                     gSpin.fillOval(hx - 8, hy - 8, 16, 16);
+                 }
+                 
+                 gSpin.setColor(new Color(80, 80, 80));
+                 gSpin.setStroke(new BasicStroke(2));
+                 gSpin.drawOval(hx - holeRadius, hy - holeRadius, holeRadius * 2, holeRadius * 2);
+             }
+             gSpin.dispose();
+             
+        } else if (rouletteState == RouletteState.SHOOTING) {
+             g.setFont(new Font("Arial", Font.BOLD, 40));
+             g.setColor(new Color(255, 50, 50));
+             drawCenteredText(g, "Puxando o Gatilho...", cy - 150);
+
+             if (revolverImage != null) {
+                 int revW = 300;
+                 int revH = (int)((double)revW / revolverImage.getWidth(null) * revolverImage.getHeight(null));
+                 
+                 // Efeito de tremer (shake)
+                 int offsetX = (int)(Math.random() * 6 - 3);
+                 int offsetY = (int)(Math.random() * 6 - 3);
+                 
+                 Graphics2D g2d = (Graphics2D) g.create();
+                 g2d.translate(cx + offsetX, cy + offsetY);
+                 g2d.drawImage(revolverImage, -revW/2, -revH/2, revW, revH, null);
+                 g2d.dispose();
+             }
+
+        } else if (rouletteState == RouletteState.FIRING) {
+             // Mantém a imagem do revólver centralizada como base (sem shake agora, ou com muito shake se for tiro)
+             if (revolverImage != null) {
+                 int revW = 300;
+                 int revH = (int)((double)revW / revolverImage.getWidth(null) * revolverImage.getHeight(null));
+                 g.drawImage(revolverImage, cx - revW/2, cy - revH/2, revW, revH, null);
+             }
+
+             if (roundDied) {
+                 // --- Animação de Tiro (BANG) ---
+                 // Clarão laranja/amarelo piscando
+                 if (firingFrame % 4 < 2) { // Pisca rápido
+                     g.setColor(new Color(255, 200, 50, 180));
+                     g.fillOval(cx - 100, cy - 100, 200, 200);
+                     g.setColor(new Color(255, 255, 200, 200));
+                     g.fillOval(cx - 60, cy - 60, 120, 120);
+                 }
+                 
+                 // Texto Gigante
+                 g.setFont(new Font("Impact", Font.BOLD, 120));
+                 g.setColor(new Color(255, 50, 50));
+                 drawCenteredText(g, "BANG!", cy + 20);
+                 
+                 // Overlay vermelho piscando na tela toda
+                 g.setColor(new Color(255, 0, 0, 60 + (firingFrame % 5) * 20));
+                 g.fillRect(0, 0, getWidth(), getHeight());
+                 
+             } else {
+                 // --- Animação de Falha (CLICK) ---
+                 // Pequeno balão ou texto saindo da arma
+                 g.setFont(new Font("Courier New", Font.BOLD, 40));
+                 g.setColor(new Color(200, 200, 200));
+                 
+                 int yOffset = -(firingFrame * 2); // Texto sobe um pouco
+                 drawCenteredText(g, "* click *", cy - 100 + yOffset);
+                 
+                 // Talvez um pequeno "puff" cinza
+                 g.setColor(new Color(100, 100, 100, 100 - firingFrame * 5));
+                 g.fillOval(cx + 80, cy - 80, 20 + firingFrame, 20 + firingFrame);
+             }
+
         } else if (rouletteState == RouletteState.RESULT) {
              // Caixa de Resultado
             Color bg = rouletteSuccess ? new Color(20, 50, 20) : new Color(50, 20, 20);
@@ -1060,7 +1343,7 @@ public class GameScreen extends Screen {
             
             // Verifica hover considerando a área expandida da carta
             Rectangle cardArea = new Rectangle(x, y - 25, cardWidth, cardHeight + 25);
-            boolean isHovered = cardArea.contains(mousePos);
+            boolean isHovered = (rouletteState == RouletteState.NONE) && cardArea.contains(mousePos);
             if (isHovered && !isSelected) {
                 y -= 15;
             }
