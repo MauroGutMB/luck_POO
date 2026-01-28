@@ -62,8 +62,15 @@ public class MenuScreen extends Screen {
         });
         add(optionsButton);
         
+        // Botão Tutorial
+        JButton tutorialButton = createMenuButton("TUTORIAL", 350, 440);
+        tutorialButton.addActionListener(e -> {
+            screenManager.changeScreen("tutorial");
+        });
+        add(tutorialButton);
+        
         // Botão Sair
-        exitButton = createMenuButton("SAIR", 350, 440);
+        exitButton = createMenuButton("SAIR", 350, 520);
         exitButton.addActionListener(e -> {
             int result = JOptionPane.showConfirmDialog(
                 this,

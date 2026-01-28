@@ -22,6 +22,7 @@ public class Main {
             // Registra as telas
             screenManager.registerScreen("menu", new MenuScreen(screenManager));
             screenManager.registerScreen("options", new OptionsScreen(screenManager));
+            screenManager.registerScreen("tutorial", new TutorialScreen(screenManager));
             screenManager.registerScreen("game", new GameScreen(screenManager));
             
             // Inicia no menu principal

@@ -2,6 +2,7 @@ package core;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Armazena o estado atual do jogo
@@ -20,6 +21,7 @@ public class GameState {
     private List<PlayingCard> selectedCards;
     private PokerHand requiredHand; // Mão mínima sugerida
     private int targetMoney; // Dinheiro necessário para avançar
+    private final Random random = new Random();
     
     public GameState() {
         this.score = 0;
@@ -77,30 +79,34 @@ public class GameState {
                 targetMoney = 20;
                 break;
             case 2:
-                requiredHand = PokerHand.TWO_PAIR; 
+                requiredHand = randomHand(PokerHand.TWO_PAIR, PokerHand.PAIR);
                 targetMoney = 50;
                 break;
             case 3: 
-                requiredHand = PokerHand.THREE_OF_KIND; 
+                requiredHand = randomHand(PokerHand.THREE_OF_KIND, PokerHand.TWO_PAIR, PokerHand.PAIR);
                 targetMoney = 150;
                 break;
             case 4: 
-                requiredHand = PokerHand.FLUSH; 
+                requiredHand = randomHand(PokerHand.FLUSH, PokerHand.THREE_OF_KIND, PokerHand.TWO_PAIR, PokerHand.PAIR);
                 targetMoney = 500;
                 break;
             case 5: 
-                requiredHand = PokerHand.FULL_HOUSE; 
+                requiredHand = randomHand(PokerHand.FULL_HOUSE, PokerHand.FLUSH, PokerHand.THREE_OF_KIND, PokerHand.TWO_PAIR, PokerHand.PAIR);
                 targetMoney = 2000;
                 break;
             case 6: 
-                requiredHand = PokerHand.FOUR_OF_KIND; 
+                requiredHand = randomHand(PokerHand.FOUR_OF_KIND, PokerHand.FULL_HOUSE, PokerHand.FLUSH, PokerHand.THREE_OF_KIND, PokerHand.TWO_PAIR, PokerHand.PAIR);
                 targetMoney = 10000;
                 break;
             default: 
-                requiredHand = PokerHand.ROYAL_FLUSH; 
-                targetMoney = (int)(targetMoney * 2.5);
+                requiredHand = randomHand(PokerHand.ROYAL_FLUSH, PokerHand.FOUR_OF_KIND, PokerHand.FULL_HOUSE, PokerHand.FLUSH, PokerHand.THREE_OF_KIND);
+                targetMoney = 50000;
                 break;
         }
+    }
+
+    private PokerHand randomHand(PokerHand... options) {
+        return options[random.nextInt(options.length)];
     }
     
     // Getters e Setters

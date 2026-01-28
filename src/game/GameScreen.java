@@ -756,7 +756,7 @@ public class GameScreen extends Screen {
         if (isReached) g.setColor(new Color(100, 255, 100));
         else g.setColor(new Color(255, 150, 150));
         
-        g.drawString("Proj: $" + formatValue(currentProjected), x + 180, y + 70);
+        g.drawString("D x M: $" + formatValue(currentProjected), x + 180, y + 70);
     }
 
     private void drawMoneyPanel(Graphics2D g) {
