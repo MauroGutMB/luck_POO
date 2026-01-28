@@ -113,6 +113,13 @@ public class GameScreen extends Screen {
     private void dealInitialHand() {
         gameState.getPlayerHand().clear();
         List<PlayingCard> cards = gameState.getGameDeck().draw(8);
+        
+        if (cards.size() < 8) {
+            JOptionPane.showMessageDialog(this, "Deck vazio! O jogo acabou.", "Fim de Jogo", JOptionPane.WARNING_MESSAGE);
+            showGameOverScreen();
+            return;
+        }
+        
         gameState.getPlayerHand().addAll(cards);
     }
     
@@ -216,7 +223,9 @@ public class GameScreen extends Screen {
         if (cardsToDraw > 0) {
             List<PlayingCard> newCards = gameState.getGameDeck().draw(cardsToDraw);
             if (newCards.size() < cardsToDraw) {
-                JOptionPane.showMessageDialog(this, "Deck quase vazio!", "Aviso", JOptionPane.WARNING_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Deck vazio! O jogo acabou.", "Fim de Jogo", JOptionPane.WARNING_MESSAGE);
+                showGameOverScreen();
+                return;
             }
             gameState.getPlayerHand().addAll(newCards);
         }
