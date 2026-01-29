@@ -155,6 +155,12 @@ public class MenuScreen extends Screen {
         if (backgroundImage != null) {
             g.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), this);
         }
+
+        // Watermark/Créditos (@maurogutmb)
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g.setFont(new Font("Consolas", Font.BOLD, 14));
+        g.setColor(new Color(80, 220, 100)); // Verde brilhante mas suave
+        g.drawString("@maurogutmb", 10, 20);
     }
     
     @Override
