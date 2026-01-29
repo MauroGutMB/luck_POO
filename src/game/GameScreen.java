@@ -51,6 +51,7 @@ public class GameScreen extends Screen {
     private JButton rouletteConfirmButton;
     private JButton rouletteCancelButton;
     private JButton rouletteContinueButton;
+    private boolean rouletteSixPenalty = false;
     
     // Jukebox Radio Vars
     private Rectangle radioPrevRect;
@@ -110,7 +111,12 @@ public class GameScreen extends Screen {
         rouletteContinueButton.addActionListener(e -> {
             rouletteState = RouletteState.NONE;
             if (rouletteSuccess) {
-                showRoundCompleteScreen();
+                if (rouletteSixPenalty) {
+                    setGameButtonsEnabled(true);
+                    initialize();
+                } else {
+                    showRoundCompleteScreen();
+                }
             } else {
                 showGameOverScreen();
             }
@@ -325,6 +331,7 @@ public class GameScreen extends Screen {
     private void startDiceRollCutscene() {
         rouletteState = RouletteState.ROLLING;
         diceAnimationFrame = 0;
+        rouletteSixPenalty = false;
         // Determine final result beforehand
         diceAnimationResult = (int) (Math.random() * 6) + 1; // 1 to 6
         
@@ -353,6 +360,22 @@ public class GameScreen extends Screen {
         // Show final result
         diceAnimationFrame = diceAnimationResult;
         repaint();
+
+        if (diceAnimationResult == 6) {
+            rouletteSixPenalty = true;
+            gameState.setMultiplier(0);
+            rouletteSuccess = true;
+            rouletteResultText = "Dado 6: multiplicador zerado.";
+            
+            Timer pause = new Timer(900, e -> {
+                ((Timer)e.getSource()).stop();
+                rouletteState = RouletteState.RESULT;
+                repaint();
+            });
+            pause.setRepeats(false);
+            pause.start();
+            return;
+        }
         
         // Pause briefly to show result then start loading bullets
         Timer pause = new Timer(1000, e -> {
@@ -532,15 +555,19 @@ public class GameScreen extends Screen {
         } else {
             // Sobreviveu
             rouletteSuccess = true;
-            int penaltySpins = Math.max(0, spinsUsed - 1);
-            double bonusFactor = Math.pow(diceAnimationResult + 1, 2) * Math.pow(0.5, penaltySpins);
-            gameState.setMultiplier(gameState.getMultiplier() * bonusFactor);
-            rouletteResultText = "CLICK! Sobreviveu. Bônus: " + (int)bonusFactor + "x!";
-            
-            // Vence a blind automaticamente
-            gameState.setMoney((int)(gameState.getMoney() * gameState.getMultiplier()));
-            if (gameState.getMoney() < gameState.getTargetMoney()) {
-                 gameState.setMoney(gameState.getTargetMoney());
+            if (rouletteSixPenalty) {
+                rouletteResultText = "CLICK! 6 no dado: multiplicador zerado e última blind.";
+            } else {
+                int penaltySpins = Math.max(0, spinsUsed - 1);
+                double bonusFactor = Math.pow(diceAnimationResult + 1, 2) * Math.pow(0.5, penaltySpins);
+                gameState.setMultiplier(gameState.getMultiplier() * bonusFactor);
+                rouletteResultText = "CLICK! Sobreviveu. Bônus: " + (int)bonusFactor + "x!";
+                
+                // Vence a blind automaticamente
+                gameState.setMoney((int)(gameState.getMoney() * gameState.getMultiplier()));
+                if (gameState.getMoney() < gameState.getTargetMoney()) {
+                     gameState.setMoney(gameState.getTargetMoney());
+                }
             }
         }
         rouletteState = RouletteState.RESULT;
@@ -1313,8 +1340,21 @@ public class GameScreen extends Screen {
 
         } else if (rouletteState == RouletteState.RESULT) {
              // Caixa de Resultado
-            Color bg = rouletteSuccess ? new Color(20, 50, 20) : new Color(50, 20, 20);
-            Color border = rouletteSuccess ? new Color(50, 200, 50) : new Color(200, 50, 50);
+            Color bg;
+            Color border;
+            Color titleColor;
+            String titleText;
+            if (rouletteSixPenalty) {
+                bg = new Color(50, 45, 15);
+                border = new Color(220, 200, 80);
+                titleColor = new Color(240, 220, 120);
+                titleText = "AVISO";
+            } else {
+                bg = rouletteSuccess ? new Color(20, 50, 20) : new Color(50, 20, 20);
+                border = rouletteSuccess ? new Color(50, 200, 50) : new Color(200, 50, 50);
+                titleColor = rouletteSuccess ? new Color(100, 255, 100) : new Color(255, 50, 50);
+                titleText = rouletteSuccess ? "SOBREVIVEU!" : "GAME OVER";
+            }
             
             g.setColor(bg);
             g.fillRoundRect(cx - 250, cy - 150, 500, 300, 20, 20);
@@ -1322,11 +1362,11 @@ public class GameScreen extends Screen {
             g.setStroke(new BasicStroke(3));
             g.drawRoundRect(cx - 250, cy - 150, 500, 300, 20, 20);
             
-            g.setFont(new Font("Arial", Font.BOLD, 48));
-            g.setColor(rouletteSuccess ? new Color(100, 255, 100) : new Color(255, 50, 50));
-            drawCenteredText(g, rouletteSuccess ? "SOBREVIVEU!" : "GAME OVER", cy - 80);
+            g.setFont(new Font("Arial", Font.BOLD, 42));
+            g.setColor(titleColor);
+            drawCenteredText(g, titleText, cy - 80);
             
-            g.setFont(new Font("Arial", Font.BOLD, 24));
+            g.setFont(new Font("Arial", Font.BOLD, 20));
             g.setColor(Color.WHITE);
             drawCenteredText(g, rouletteResultText, cy);
             

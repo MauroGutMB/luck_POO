@@ -15,6 +15,8 @@ public class SoundManager {
     private float globalFadeFactor = 1.0f; // Managed by ScreenManager for transitions
     private boolean isMenuMusicPlaying = false;
     private boolean isRadioPlaying = false;
+    private Timer menuFadeTimer;
+    private float menuLocalVolume = 1.0f; // Fade-in do menu
     
     // Radio variables
     private List<File> radioPlaylist;
@@ -62,6 +64,9 @@ public class SoundManager {
             if (name.equals("menu_st.wav")) {
                 continue; // excluir música do menu
             }
+            if (name.equals("ya-feel-me-something-i-just-threw-together-416838.wav")) {
+                continue; // música removida
+            }
             radioPlaylist.add(f);
         }
     }
@@ -80,9 +85,12 @@ public class SoundManager {
         if (menuMusic != null) {
             if (!isMenuMusicPlaying) {
                 menuMusic.setFramePosition(0);
+                menuLocalVolume = 0.0f;
+                updateVolume();
                 menuMusic.loop(Clip.LOOP_CONTINUOUSLY);
                 menuMusic.start();
                 isMenuMusicPlaying = true;
+                startMenuFadeIn();
             }
             updateVolume(); 
         }
@@ -93,6 +101,21 @@ public class SoundManager {
             menuMusic.stop();
             isMenuMusicPlaying = false;
         }
+    }
+
+    private void startMenuFadeIn() {
+        if (menuFadeTimer != null && menuFadeTimer.isRunning()) {
+            menuFadeTimer.stop();
+        }
+        menuFadeTimer = new Timer(50, e -> {
+            menuLocalVolume += 0.05f;
+            if (menuLocalVolume >= 1.0f) {
+                menuLocalVolume = 1.0f;
+                ((Timer) e.getSource()).stop();
+            }
+            updateVolume();
+        });
+        menuFadeTimer.start();
     }
 
     // --- RADIO CONTROL ---
@@ -204,7 +227,7 @@ public class SoundManager {
         float baseVolume = (globalSettingsVolume / 100.0f);
         
         // Calculate final volumes
-        float menuFinal = baseVolume * globalFadeFactor;
+        float menuFinal = baseVolume * globalFadeFactor * menuLocalVolume;
         
         // Radio is affected by global fade AND local fade (crossfade)
         float radioFinal = baseVolume * globalFadeFactor * radioLocalVolume;

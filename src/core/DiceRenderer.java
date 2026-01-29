@@ -32,23 +32,19 @@ public class DiceRenderer {
                 int h = spriteSheet.getHeight();
                 faces = new BufferedImage[6];
                 
-                // Heurística para detectar layout
                 if (w > h * 4) {
-                    // Provavelmente tira horizontal (6x1)
                     faceWidth = w / 6;
                     faceHeight = h;
                     for (int i = 0; i < 6; i++) {
                         faces[i] = spriteSheet.getSubimage(i * faceWidth, 0, faceWidth, faceHeight);
                     }
                 } else if (h > w * 4) {
-                    // Provavelmente tira vertical (1x6)
                     faceWidth = w;
                     faceHeight = h / 6;
                     for (int i = 0; i < 6; i++) {
                         faces[i] = spriteSheet.getSubimage(0, i * faceHeight, faceWidth, faceHeight);
                     }
                 } else if (w > h) {
-                    // Provavelmente Grid 3x2
                     faceWidth = w / 3;
                     faceHeight = h / 2;
                     for (int i = 0; i < 6; i++) {
@@ -57,7 +53,6 @@ public class DiceRenderer {
                         faces[i] = spriteSheet.getSubimage(col * faceWidth, row * faceHeight, faceWidth, faceHeight);
                     }
                 } else {
-                    // Provavelmente Grid 2x3
                     faceWidth = w / 2;
                     faceHeight = h / 3;
                     for (int i = 0; i < 6; i++) {

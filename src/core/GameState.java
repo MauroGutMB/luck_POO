@@ -81,19 +81,19 @@ public class GameState {
                 break;
             case 2:
                 requiredHand = randomHand(PokerHand.TWO_PAIR, PokerHand.PAIR);
-                targetMoney = 75;
+                targetMoney = 100;
                 break;
             case 3: 
                 requiredHand = randomHand(PokerHand.THREE_OF_KIND, PokerHand.TWO_PAIR, PokerHand.PAIR);
-                targetMoney = 350;
+                targetMoney = 400;
                 break;
             case 4: 
                 requiredHand = randomHand(PokerHand.FLUSH, PokerHand.THREE_OF_KIND, PokerHand.TWO_PAIR, PokerHand.PAIR);
-                targetMoney = 800;
+                targetMoney = 1300;
                 break;
             case 5: 
                 requiredHand = randomHand(PokerHand.FULL_HOUSE, PokerHand.FLUSH, PokerHand.THREE_OF_KIND, PokerHand.TWO_PAIR, PokerHand.PAIR);
-                targetMoney = 2700;
+                targetMoney = 5000;
                 break;
             case 6: 
                 requiredHand = randomHand(PokerHand.FOUR_OF_KIND, PokerHand.FULL_HOUSE, PokerHand.FLUSH, PokerHand.THREE_OF_KIND, PokerHand.TWO_PAIR, PokerHand.PAIR);
