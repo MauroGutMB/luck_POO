@@ -25,18 +25,27 @@ public class GameScreen extends Screen {
     private Point mousePos;
     
     // Cutscene/Roulette State
-    private enum RouletteState { NONE, WARNING, ROLLING, LOADING, SPINNING, SHOOTING, FIRING, RESULT }
+    private enum RouletteState { 
+        NONE, WARNING, ROLLING, LOADING, // Fases Automáticas
+        READY_TO_SPIN, SPINNING, READY_TO_SHOOT, // Fases Interativas (Giro)
+        SHOOTING, FIRING, RESULT // Fases Finais
+    }
     private RouletteState rouletteState = RouletteState.NONE;
     private int diceAnimationFrame = 0;
     private int diceAnimationResult = 1;
     // Animation vars
     private int loadingBulletIndex = 0;
     private double cylinderAngle = 0; // Angle for spinning animation
+    private double currentSpinVelocity = 0; // Velocidade atual do giro
+    private long spinStartTime = 0; // Para controlar tempo mínimo
     private int shootingFrame = 0;
     private int firingFrame = 0; // Para animação de tiro
     private boolean roundDied = false; // Armazena resultado temporariamente
     private int finalChamberSlot = 0; // Slot que vai parar no gatilho (0-5)
+    private int spinsUsed = 0; // Quantidade de giros usados
+    private static final int MAX_SPINS = 3; // Limite de giros
     private Timer diceTimer;
+    private Timer physicsTimer; // Timer específico para física do giro
     private String rouletteResultText = "";
     private boolean rouletteSuccess = false;
     private JButton rouletteConfirmButton;
@@ -62,9 +71,28 @@ public class GameScreen extends Screen {
     }
     
     private void setupRouletteButtons() {
-        // Inicializa botões do overlay de roleta, mas não os adiciona ainda
+        // Inicializa botões do overlay de roleta
         rouletteConfirmButton = createActionButton("PUXAR GATILHO", 0, 0, new Color(142, 68, 173));
-        rouletteConfirmButton.addActionListener(e -> startDiceRollCutscene());
+        
+        // Listener Dinâmico Contextual
+        rouletteConfirmButton.addActionListener(e -> {
+            switch (rouletteState) {
+                case WARNING:
+                    startDiceRollCutscene();
+                    break;
+                case READY_TO_SPIN:
+                    startManualSpinning();
+                    break;
+                case SPINNING:
+                    boostSpin();
+                    break;
+                case READY_TO_SHOOT:
+                    startShootingCutscene();
+                    break;
+                default:
+                    break;
+            }
+        });
         
         rouletteCancelButton = createActionButton("CANCELAR", 0, 0, new Color(120, 120, 120));
         rouletteCancelButton.addActionListener(e -> {
@@ -295,6 +323,8 @@ public class GameScreen extends Screen {
 
     private void playRussianRoulette() {
         rouletteState = RouletteState.WARNING;
+        rouletteConfirmButton.setText("PUXAR GATILHO");
+        spinsUsed = 0;
         setGameButtonsEnabled(false);
         repaint();
     }
@@ -353,10 +383,15 @@ public class GameScreen extends Screen {
                 
                 if (loadingBulletIndex >= diceAnimationResult) {
                      ((Timer)e.getSource()).stop();
-                     // Pause before spinning
+                     
+                     // Transição para aguardar o giro manual
                      Timer pause = new Timer(500, ev -> {
                          ((Timer)ev.getSource()).stop();
-                         startSpinningCutscene();
+                         // Prepara para o estado interativo
+                         rouletteState = RouletteState.READY_TO_SPIN;
+                         rouletteConfirmButton.setText("GIRAR TAMBOR");
+                         spinsUsed = 0;
+                         repaint();
                      });
                      pause.setRepeats(false);
                      pause.start();
@@ -366,50 +401,89 @@ public class GameScreen extends Screen {
         loadTimer.start();
     }
 
-    private void startSpinningCutscene() {
+    private void startManualSpinning() {
         rouletteState = RouletteState.SPINNING;
+        rouletteConfirmButton.setText("GIRAR MAIS!");
+        if (spinsUsed < MAX_SPINS) {
+            spinsUsed++;
+        }
+        currentSpinVelocity = 40.0; // Velocidade inicial alta
+        spinStartTime = System.currentTimeMillis();
+        cylinderAngle = 0;
         
-        // Decidir resultado agora para alinhar visualmente com a lógica
-        // Slots 0 a (bullets-1) têm bala.
-        // Escolhemos um slot aleatório de 0 a 5 para ficar no topo (gatilho).
-        finalChamberSlot = (int)(Math.random() * 6);
-        
-        // Calcular angulo alvo para que o slot escolhido termine no topo (visual -90 graus)
-        double targetRotationForAlignment = (360 - (finalChamberSlot * 60)) % 360;
-        double totalRotation = 360 * 5 + targetRotationForAlignment; // 5 voltas completas + alinhamento
-        
-        long startTime = System.currentTimeMillis();
-        long duration = 2000; // 2 segundos de giro
-
-        // Timer spinning the chamber
-        Timer spinTimer = new Timer(16, new ActionListener() {
+        // Timer de física (60 FPS aprox)
+        physicsTimer = new Timer(16, new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                long now = System.currentTimeMillis();
-                float progress = (float)(now - startTime) / duration;
-                
-                if (progress >= 1.0f) {
-                    progress = 1.0f;
-                    cylinderAngle = totalRotation;
-                    repaint();
-                    ((Timer)e.getSource()).stop();
-                    
-                    // Pausa muda mostrando o tambor alinhado antes do tiro
-                    Timer pause = new Timer(1000, ev -> {
-                        ((Timer)ev.getSource()).stop();
-                        startShootingCutscene();
-                    });
-                    pause.setRepeats(false);
-                    pause.start();
-                } else {
-                    // Ease-out
-                    float ease = 1 - (1 - progress) * (1 - progress) * (1 - progress); 
-                    cylinderAngle = totalRotation * ease;
-                    repaint();
-                }
+                updateSpinPhysics();
             }
         });
-        spinTimer.start();
+        physicsTimer.start();
+    }
+    
+    private void boostSpin() {
+         // Adiciona impulso se o jogador clicar durante o giro
+            if (spinsUsed >= MAX_SPINS) {
+               rouletteConfirmButton.setText("SEM GIROS");
+               return;
+            }
+            spinsUsed++;
+         currentSpinVelocity += 15.0;
+         // Limita a velocidade máxima
+         if (currentSpinVelocity > 80.0) currentSpinVelocity = 80.0;
+    }
+    
+    private void updateSpinPhysics() {
+        // Aplica velocidade
+        cylinderAngle += currentSpinVelocity;
+        
+        // Atrito (Friction)
+        currentSpinVelocity *= 0.985;
+        
+        long elapsed = System.currentTimeMillis() - spinStartTime;
+        boolean minTimePassed = elapsed > 3000;
+        
+        // Se a velocidade está baixa e já passou o tempo mínimo, para.
+        if (minTimePassed && currentSpinVelocity < 2.0) {
+            physicsTimer.stop();
+            snapToSlot();
+        } else if (currentSpinVelocity < 0.5) {
+             // Se parar por atrito antes dos 3s (improvável com 40 start, mas por segurança), re-impulsiona min
+             if (!minTimePassed) currentSpinVelocity = 5.0; 
+        }
+        
+        repaint();
+    }
+    
+    private void snapToSlot() {
+        // Alinha ao slot mais próximo
+        // Escolhe o slot final baseado no angulo onde parou
+        // ângulo visual = (slot * 60 - 90) + offset
+        // Inverso: onde parou -> qual slot está no topo (-90 visual / 270 deg)
+        
+        // Normaliza angulo 0-360
+        double normalized = cylinderAngle % 360; 
+        // Inverte lógica visual para achar o indice
+        // visual = (idx * 60 - 90) + rot
+        // topo (270) = idx * 60 - 90 + rot
+        // 360 = idx * 60 + rot
+        // idx * 60 = 360 - rot
+        // idx = (360 - rot) / 60
+        
+        double virtualIndex = (360 - normalized) / 60.0;
+        finalChamberSlot = (int)Math.round(virtualIndex) % 6;
+        if (finalChamberSlot < 0) finalChamberSlot += 6;
+        
+        // Ajusta angulo final exato para alinhar graficamente
+        // targetRot = 360 - (final * 60)
+        double targetRot = (360 - (finalChamberSlot * 60.0));
+        
+        // Pequena animação de "snap" (travar)
+        cylinderAngle = targetRot; // Simplificado: seta direto (pode animar se quiser sutileza)
+        
+        rouletteState = RouletteState.READY_TO_SHOOT;
+        rouletteConfirmButton.setText("ATIRAR");
+        repaint();
     }
 
     private void startShootingCutscene() {
@@ -461,13 +535,14 @@ public class GameScreen extends Screen {
         if (roundDied) {
             // Morreu
             rouletteSuccess = false;
-            rouletteResultText = "BANG! O tambor parou na bala (S" + (finalChamberSlot + 1) + ").";
+            rouletteResultText = "BANG! O tambor parou na bala.";
         } else {
             // Sobreviveu
             rouletteSuccess = true;
-            double bonusFactor = Math.pow(diceAnimationResult + 1, 2);
+            int penaltySpins = Math.max(0, spinsUsed - 1);
+            double bonusFactor = Math.pow(diceAnimationResult + 1, 2) * Math.pow(0.5, penaltySpins);
             gameState.setMultiplier(gameState.getMultiplier() * bonusFactor);
-            rouletteResultText = "CLICK! Sobreviveu. (S" + (finalChamberSlot + 1) + " Vazio). Bônus: " + (int)bonusFactor + "x!";
+            rouletteResultText = "CLICK! Sobreviveu. Bônus: " + (int)bonusFactor + "x!";
             
             // Vence a blind automaticamente
             gameState.setMoney((int)(gameState.getMoney() * gameState.getMultiplier()));
@@ -1088,101 +1163,63 @@ public class GameScreen extends Screen {
              g.setColor(new Color(231, 76, 60));
              drawCenteredText(g, "Carregando " + diceAnimationResult + " bala(s)...", cy - 200);
              
-             // --- Desenho do Tambor (Cylinder) ---
-             int cylRadius = 120; // Raio do tambor
-             int holeDist = 70;   // Distância dos buracos ao centro
-             int holeRadius = 25; // Raio de cada buraco
+             drawCylinder(g, cx, cy, 0, loadingBulletIndex);
+
+        } else if (rouletteState == RouletteState.READY_TO_SPIN) {
+             g.setFont(new Font("Arial", Font.BOLD, 40));
+             g.setColor(new Color(46, 204, 113));
+             drawCenteredText(g, "Pronto para Girar!", cy - 200);
              
-             // Corpo do tambor
-             g.setColor(new Color(40, 40, 40));
-             g.fillOval(cx - cylRadius, cy - cylRadius, cylRadius * 2, cylRadius * 2);
-             g.setColor(new Color(20, 20, 20));
-             g.setStroke(new BasicStroke(5));
-             g.drawOval(cx - cylRadius, cy - cylRadius, cylRadius * 2, cylRadius * 2);
-             
-             // Eixo central
-             g.setColor(new Color(10, 10, 10));
-             g.fillOval(cx - 15, cy - 15, 30, 30);
-             
-             // Balas/Buracos
-             for (int i = 0; i < 6; i++) {
-                 double theta = Math.toRadians(i * 60 - 90); // -90 para começar do topo (12h)
-                 int hx = cx + (int)(Math.cos(theta) * holeDist);
-                 int hy = cy + (int)(Math.sin(theta) * holeDist);
-                 
-                 // Fundo do buraco
-                 g.setColor(Color.BLACK);
-                 g.fillOval(hx - holeRadius, hy - holeRadius, holeRadius * 2, holeRadius * 2);
-                 
-                 // Bala (se já foi carregada neste slot)
-                 if (i < loadingBulletIndex) {
-                     // Cartucho (Dourado)
-                     g.setColor(new Color(218, 165, 32)); 
-                     g.fillOval(hx - holeRadius + 2, hy - holeRadius + 2, holeRadius * 2 - 4, holeRadius * 2 - 4);
-                     // Espoleta (Prata/Cinza)
-                     g.setColor(new Color(180, 180, 180)); 
-                     g.fillOval(hx - 8, hy - 8, 16, 16);
-                     // Anel da espoleta
-                     g.setColor(new Color(150, 150, 150));
-                     g.setStroke(new BasicStroke(1));
-                     g.drawOval(hx - 8, hy - 8, 16, 16);
-                 }
-                 
-                 // Borda do buraco
-                 g.setColor(new Color(80, 80, 80));
-                 g.setStroke(new BasicStroke(2));
-                 g.drawOval(hx - holeRadius, hy - holeRadius, holeRadius * 2, holeRadius * 2);
+             drawRouletteHUD(g, cx, cy); // HUD lateral
+             drawClosedDrumOverlay(g, cx, cy, 0); 
+
+             rouletteConfirmButton.setBounds(cx - 100, cy + 150, 200, 50);
+             if (rouletteConfirmButton.getParent() != this) {
+                 add(rouletteConfirmButton);
+                 revalidate();
              }
+             g.translate(rouletteConfirmButton.getX(), rouletteConfirmButton.getY());
+             rouletteConfirmButton.paint(g);
+             g.translate(-rouletteConfirmButton.getX(), -rouletteConfirmButton.getY());
 
         } else if (rouletteState == RouletteState.SPINNING) {
-             // Texto ou Efeito de "Giro"
              g.setFont(new Font("Arial", Font.BOLD, 40));
              g.setColor(new Color(231, 76, 60));
-             drawCenteredText(g, "Girando Tambor...", cy - 200);
+             drawCenteredText(g, "Girando...", cy - 200);
              
-             int cylRadius = 120;
-             int holeDist = 70;
-             int holeRadius = 25;
-             
-             Graphics2D gSpin = (Graphics2D) g.create();
-             // Renderização de qualidade para rotação
-             gSpin.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-             gSpin.rotate(Math.toRadians(cylinderAngle), cx, cy); // Aplica rotação
-             
-             // Corpo
-             gSpin.setColor(new Color(40, 40, 40));
-             gSpin.fillOval(cx - cylRadius, cy - cylRadius, cylRadius * 2, cylRadius * 2);
-             gSpin.setColor(new Color(20, 20, 20));
-             gSpin.setStroke(new BasicStroke(5));
-             gSpin.drawOval(cx - cylRadius, cy - cylRadius, cylRadius * 2, cylRadius * 2);
-             
-             // Eixo
-             gSpin.setColor(new Color(10, 10, 10));
-             gSpin.fillOval(cx - 15, cy - 15, 30, 30);
-             
-             for (int i = 0; i < 6; i++) {
-                 double theta = Math.toRadians(i * 60 - 90);
-                 int hx = cx + (int)(Math.cos(theta) * holeDist);
-                 int hy = cy + (int)(Math.sin(theta) * holeDist);
-                 
-                 gSpin.setColor(Color.BLACK);
-                 gSpin.fillOval(hx - holeRadius, hy - holeRadius, holeRadius * 2, holeRadius * 2);
-                 
-                 // Desenha todas as balas carregadas
-                 if (i < diceAnimationResult) {
-                     gSpin.setColor(new Color(218, 165, 32));
-                     gSpin.fillOval(hx - holeRadius + 2, hy - holeRadius + 2, holeRadius * 2 - 4, holeRadius * 2 - 4);
-                     gSpin.setColor(new Color(180, 180, 180)); 
-                     gSpin.fillOval(hx - 8, hy - 8, 16, 16);
-                 }
-                 
-                 gSpin.setColor(new Color(80, 80, 80));
-                 gSpin.setStroke(new BasicStroke(2));
-                 gSpin.drawOval(hx - holeRadius, hy - holeRadius, holeRadius * 2, holeRadius * 2);
+             drawRouletteHUD(g, cx, cy); // HUD lateral
+             drawClosedDrumOverlay(g, cx, cy, cylinderAngle);
+
+             rouletteConfirmButton.setBounds(cx - 100, cy + 150, 200, 50);
+             if (rouletteConfirmButton.getParent() != this) {
+                 add(rouletteConfirmButton);
+                 revalidate();
              }
-             gSpin.dispose();
+             g.translate(rouletteConfirmButton.getX(), rouletteConfirmButton.getY());
+             rouletteConfirmButton.paint(g);
+             g.translate(-rouletteConfirmButton.getX(), -rouletteConfirmButton.getY());
+
+        } else if (rouletteState == RouletteState.READY_TO_SHOOT) {
+             g.setFont(new Font("Arial", Font.BOLD, 40));
+             g.setColor(new Color(255, 50, 50));
+             drawCenteredText(g, "PRONTO PARA ATIRAR", cy - 200);
+             
+             drawRouletteHUD(g, cx, cy); // HUD lateral
+             drawClosedDrumOverlay(g, cx, cy, cylinderAngle);
+
+             rouletteConfirmButton.setBounds(cx - 100, cy + 150, 200, 50);
+             if (rouletteConfirmButton.getParent() != this) {
+                 add(rouletteConfirmButton);
+                 revalidate();
+             }
+             g.translate(rouletteConfirmButton.getX(), rouletteConfirmButton.getY());
+             rouletteConfirmButton.paint(g);
+             g.translate(-rouletteConfirmButton.getX(), -rouletteConfirmButton.getY());
              
         } else if (rouletteState == RouletteState.SHOOTING) {
+             if (rouletteConfirmButton.getParent() == this) {
+                 remove(rouletteConfirmButton);
+             }
              g.setFont(new Font("Arial", Font.BOLD, 40));
              g.setColor(new Color(255, 50, 50));
              drawCenteredText(g, "Puxando o Gatilho...", cy - 150);
@@ -1313,6 +1350,162 @@ public class GameScreen extends Screen {
                revalidate();
             }
         }
+    }
+    private void drawRouletteHUD(Graphics2D g, int cx, int cy) {
+        // Calculate current potential bonus
+        double baseBonus = Math.pow(diceAnimationResult + 1, 2);
+        int penaltySpins = Math.max(0, spinsUsed - 1);
+        double currentBonus = baseBonus * Math.pow(0.5, penaltySpins);
+
+        // --- Painel ESQUERDO (Multiplicador) ---
+        int panelW = 180;
+        int panelH = 100;
+        int leftX = cx - 350; 
+        int panelY = cy - 50; 
+
+        g.setColor(new Color(20, 30, 20, 220));
+        g.fillRoundRect(leftX, panelY, panelW, panelH, 20, 20);
+        g.setColor(new Color(50, 200, 50)); // Borda Verde
+        g.setStroke(new BasicStroke(2));
+        g.drawRoundRect(leftX, panelY, panelW, panelH, 20, 20);
+
+        g.setFont(new Font("Arial", Font.BOLD, 14));
+        g.setColor(new Color(150, 255, 150));
+        g.drawString("POTENCIAL DE BÔNUS", leftX + 15, panelY + 25);
+        
+        g.setFont(new Font("Arial", Font.BOLD, 36));
+        g.setColor(new Color(80, 255, 80));
+        String bonusStr = String.format("%.2f", currentBonus) + "x";
+        FontMetrics fm = g.getFontMetrics();
+        g.drawString(bonusStr, leftX + (panelW - fm.stringWidth(bonusStr))/2, panelY + 70);
+        
+        // --- Painel DIREITO (Giros) ---
+        int rightX = cx + 170; 
+        
+        g.setColor(new Color(20, 20, 30, 220));
+        g.fillRoundRect(rightX, panelY, panelW, panelH, 20, 20);
+        
+        Color spinColor = (spinsUsed >= MAX_SPINS) ? new Color(255, 80, 80) : new Color(100, 200, 255);
+        g.setColor(spinColor);
+        g.drawRoundRect(rightX, panelY, panelW, panelH, 20, 20);
+
+        g.setFont(new Font("Arial", Font.BOLD, 14));
+        g.setColor(new Color(200, 200, 255));
+        g.drawString("GIROS RESTANTES", rightX + 25, panelY + 25);
+
+        g.setFont(new Font("Arial", Font.BOLD, 36));
+        g.setColor(spinColor);
+        String spinStr = (MAX_SPINS - spinsUsed) + " / " + MAX_SPINS;
+        int spinW = g.getFontMetrics().stringWidth(spinStr);
+        g.drawString(spinStr, rightX + (panelW - spinW)/2, panelY + 70);
+    }
+    
+    private void drawClosedDrumOverlay(Graphics2D g, int cx, int cy, double angle) {
+        int cylRadius = 120;
+        int holeDist = 70;
+        int holeRadius = 25;
+        
+        // --- 1. Tambor Giratório Sob a Película ---
+        Graphics2D gRot = (Graphics2D) g.create();
+        gRot.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        gRot.rotate(Math.toRadians(angle), cx, cy);
+        
+        // Base escura do tambor
+        gRot.setColor(new Color(40, 40, 40)); 
+        gRot.fillOval(cx - cylRadius, cy - cylRadius, cylRadius * 2, cylRadius * 2);
+        
+        // Desenha os 6 chambers como pretos (sem revelar nada)
+        for (int i = 0; i < 6; i++) {
+             double theta = Math.toRadians(i * 60 - 90);
+             int hx = cx + (int)(Math.cos(theta) * holeDist);
+             int hy = cy + (int)(Math.sin(theta) * holeDist);
+             
+             // Chamber Preto (Buraco Escuro)
+             gRot.setColor(Color.BLACK);
+             gRot.fillOval(hx - holeRadius, hy - holeRadius, holeRadius * 2, holeRadius * 2);
+             
+             // Pequena borda interna para definição visual
+             gRot.setColor(new Color(60, 60, 60, 100));
+             gRot.setStroke(new BasicStroke(2));
+             gRot.drawOval(hx - holeRadius, hy - holeRadius, holeRadius * 2, holeRadius * 2);
+        }
+        
+        gRot.dispose();
+        
+        // --- 2. A Película Cinza por Cima (Film Overlay) ---
+        // Desenha uma camada semi-transparente sobre o tambor giratório para dar o efeito "fechado"
+        // mas mantendo os buracos pretos visíveis por baixo (contraste)
+        g.setColor(new Color(60, 60, 60, 150)); // Cinza semi-transparente
+        g.fillOval(cx - cylRadius, cy - cylRadius, cylRadius * 2, cylRadius * 2);
+        
+        // Borda do tambor fechado
+        g.setColor(new Color(30, 30, 30));
+        g.setStroke(new BasicStroke(4));
+        g.drawOval(cx - cylRadius, cy - cylRadius, cylRadius * 2, cylRadius * 2);
+        
+        // Eixo central
+        g.setColor(new Color(20, 20, 20));
+        g.fillOval(cx - 15, cy - 15, 30, 30);
+        
+        // --- 3. Seta Indicativa ---
+        // Aponta para o topo (12 horas)
+        int arrowY = cy - cylRadius - 10;
+        
+        g.setColor(new Color(255, 50, 50)); // Vermelho
+        
+        Polygon arrow = new Polygon();
+        arrow.addPoint(cx - 15, arrowY - 20); // Topo Esq
+        arrow.addPoint(cx + 15, arrowY - 20); // Topo Dir
+        arrow.addPoint(cx, arrowY);           // Ponta Baixo
+        
+        g.fillPolygon(arrow);
+        
+        g.setFont(new Font("Arial", Font.BOLD, 14));
+        g.setColor(new Color(255, 100, 100));
+        drawCenteredText(g, "ALVO", arrowY - 25);
+    }
+
+    private void drawCylinder(Graphics2D g, int cx, int cy, double angle, int bulletsLoaded) {
+         int cylRadius = 120;
+         int holeDist = 70;
+         int holeRadius = 25;
+         
+         Graphics2D gCyl = (Graphics2D) g.create();
+         gCyl.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+         gCyl.rotate(Math.toRadians(angle), cx, cy);
+         
+         // Corpo
+         gCyl.setColor(new Color(40, 40, 40));
+         gCyl.fillOval(cx - cylRadius, cy - cylRadius, cylRadius * 2, cylRadius * 2);
+         gCyl.setColor(new Color(20, 20, 20));
+         gCyl.setStroke(new BasicStroke(5));
+         gCyl.drawOval(cx - cylRadius, cy - cylRadius, cylRadius * 2, cylRadius * 2);
+         
+         // Eixo
+         gCyl.setColor(new Color(10, 10, 10));
+         gCyl.fillOval(cx - 15, cy - 15, 30, 30);
+         
+         for (int i = 0; i < 6; i++) {
+             double theta = Math.toRadians(i * 60 - 90);
+             int hx = cx + (int)(Math.cos(theta) * holeDist);
+             int hy = cy + (int)(Math.sin(theta) * holeDist);
+             
+             gCyl.setColor(Color.BLACK);
+             gCyl.fillOval(hx - holeRadius, hy - holeRadius, holeRadius * 2, holeRadius * 2);
+             
+             // Desenha todas as balas carregadas (visual relativo ao tambor)
+             if (i < bulletsLoaded) {
+                 gCyl.setColor(new Color(218, 165, 32));
+                 gCyl.fillOval(hx - holeRadius + 2, hy - holeRadius + 2, holeRadius * 2 - 4, holeRadius * 2 - 4);
+                 gCyl.setColor(new Color(180, 180, 180)); 
+                 gCyl.fillOval(hx - 8, hy - 8, 16, 16);
+             }
+             
+             gCyl.setColor(new Color(80, 80, 80));
+             gCyl.setStroke(new BasicStroke(2));
+             gCyl.drawOval(hx - holeRadius, hy - holeRadius, holeRadius * 2, holeRadius * 2);
+         }
+         gCyl.dispose();
     }
     
     private void drawCenteredText(Graphics2D g, String text, int y) {
