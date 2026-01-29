@@ -5,8 +5,15 @@
 
 --- 
 
+## Compilação e execução
+
+**Compilar:**
+
  javac -d bin -sourcepath src .\src\Main.java
- java .\src\Main.java
+
+**Executar:**
+
+ java -cp bin Main
 
 ## Funcionalidades
 
@@ -32,13 +39,16 @@
   - O jogador joga uma **mão de até 5 cartas**.  
 - Cada mão de pôquer soma ao **multiplicador de dinheiro** do jogador.  
   - O multiplicador é aplicado ao dinheiro **ao final da 3ª aposta**.  
-- O jogador inciará cada aposta com 5 descartes, podendo descartar até 5 cartas.  
-  - O jogo poderá acabar caso o deck de 52 cartas se esvazie durante uma rodada. 
-- O jogador pode escolher **rodar um dado de 6 lados**:  
-  - O número sorteado = quantidade de balas do revólver (**b/6**).  
+- O jogador inicia cada aposta com **5 descartes**, podendo descartar até 5 cartas.  
+  - O jogo pode acabar se o deck de 52 cartas se esvaziar durante uma rodada. 
+- O jogador pode escolher **rodar um dado de 6 lados** (Roleta Russa):  
+  - O número sorteado define a quantidade de balas no tambor (**b/6**).  
   - O revólver pode **aumentar** o multiplicador de acordo com a probabilidade.  
-- Fórmula do revólver:  
-  - `MULT * ((n + 1) ^ 2)`  
+  - É possível girar o tambor manualmente até **3 vezes**.  
+  - A penalidade de giros aplica um fator de $0.5^{\max(0,\text{giros}-1)}$.  
+  - Se o dado cair em **6**, o jogador rola novamente (cadeia de 6) e o bônus soma por cada 6 consecutivo.  
+- Fórmula base do revólver:  
+  - $\text{MULT} \times (n + 1)^2$  
   - Onde **n** = número de balas no tambor.  
 
 ---

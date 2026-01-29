@@ -87,22 +87,34 @@ public class TutorialScreen extends Screen {
         JTextArea textArea = new JTextArea();
         textArea.setText(
             "OBJETIVO:\n" +
-            "Vença as 'Blinds' acumulando dinheiro suficiente para atingir a meta.\n\n" +
+            "Vença as Blinds acumulando dinheiro suficiente para atingir a meta.\n\n" +
             
             "COMO JOGAR:\n" +
             "1. Receba 8 cartas do baralho.\n" +
             "2. Selecione até 5 cartas para formar uma mão de poker.\n" +
-            "3. O jogo calculará o valor da sua mão e aplicará ao seu multiplicador.\n" +
-            "4. Se tiver cartas ruins, use a opção DESCARTAR para trocar cartas e encher sua mão novamente.\n\n" +
+            "3. O jogo calcula o valor da sua mão e aplica no multiplicador.\n" +
+            "4. Use DESCARTAR para trocar cartas e completar sua mão.\n\n" +
             
             "REGRAS DA BLIND:\n" +
-            "- Meta de Dinheiro: Valor que você precisa atingir para passar de fase.\n" +
-            "- Mão Alvo: A Blind exige uma mão mínima (Ex: Dois Pares, Trinca).\n" +
-            "- Mãos por Blind: Você tem apenas 3 JOGADAS para bater a meta.\n\n" +
+            "- Meta de Dinheiro: valor que você precisa atingir para passar.\n" +
+            "- Mão Alvo: exige uma mão mínima (ex.: Dois Pares, Trinca).\n" +
+            "- Mãos por Blind: você tem apenas 3 JOGADAS para bater a meta.\n\n" +
+            
+            "DESCARTES E BARALHO:\n" +
+            "- Você inicia cada aposta com 5 descartes.\n" +
+            "- O jogo pode acabar se o deck de 52 cartas esvaziar na rodada.\n\n" +
             
             "PONTUAÇÃO vs PENALIDADE:\n" +
-            "- SUCESSO: Se sua mão for igual ou superior à Mão Alvo, você ganha pontos no multiplicador.\n" +
-            "- FALHA: Se jogar uma mão inferior à Mão Alvo, você sofre uma PENALIDADE e perde multiplicador.\n\n" +
+            "- SUCESSO: se sua mão for igual ou superior à Mão Alvo, ganha multiplicador.\n" +
+            "- FALHA: se for inferior, sofre penalidade e perde multiplicador.\n\n" +
+            
+            "ROULETA RUSSA (DADO):\n" +
+            "- O dado define o número de balas no tambor (b/6).\n" +
+            "- A roleta pode aumentar o multiplicador com base no risco.\n" +
+            "- É possível girar o tambor manualmente até 3 vezes.\n" +
+            "- Penalidade de giros aplica fator 0.5^(max(0, giros-1)).\n" +
+            "- Se o dado cair em 6, você rola novamente e soma o bônus por cada 6.\n" +
+            "- Fórmula base: MULT * (n + 1)^2.\n\n" +
             
             "GAME OVER:\n" +
             "- Se não atingir a meta após 3 mãos.\n" +
