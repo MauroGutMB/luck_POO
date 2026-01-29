@@ -110,7 +110,7 @@ public class ScreenManager {
         
         // Lógica de Música
         if (name.equals("game")) {
-            SoundManager.getInstance().stopMenuMusic();
+            SoundManager.getInstance().startRadio();
         } else {
             SoundManager.getInstance().playMenuMusic();
         }

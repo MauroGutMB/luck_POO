@@ -55,8 +55,7 @@ public class GameScreen extends Screen {
     // Jukebox Radio Vars
     private Rectangle radioPrevRect;
     private Rectangle radioNextRect;
-    private String currentTrackName = "Track 01 - Jazz Noir";
-    private int currentTrackIndex = 1;
+    // Track management now via SoundManager
     
     public GameScreen(ScreenManager screenManager) {
         super(screenManager);
@@ -160,16 +159,10 @@ public class GameScreen extends Screen {
 
     private void handleRadioClick(Point p) {
         if (radioPrevRect != null && radioPrevRect.contains(p)) {
-            // Previous track logic
-            currentTrackIndex--;
-            if (currentTrackIndex < 1) currentTrackIndex = 12;
-            currentTrackName = "Track " + String.format("%02d", currentTrackIndex) + " - Jazz Noir";
+            SoundManager.getInstance().prevTrack();
             repaint();
         } else if (radioNextRect != null && radioNextRect.contains(p)) {
-            // Next track logic
-            currentTrackIndex++;
-            if (currentTrackIndex > 12) currentTrackIndex = 1;
-            currentTrackName = "Track " + String.format("%02d", currentTrackIndex) + " - Jazz Noir";
+            SoundManager.getInstance().nextTrack();
             repaint();
         }
     }
@@ -1041,9 +1034,11 @@ public class GameScreen extends Screen {
         g.setColor(new Color(100, 255, 100)); // Verde Matrix
         FontMetrics fm = g.getFontMetrics();
         // Scroll simulado ou crop
-        String drawStr = currentTrackName;
+        String drawStr = SoundManager.getInstance().getCurrentTrackName();
         if (fm.stringWidth(drawStr) > displayW - 10) {
-            drawStr = drawStr.substring(0, 12) + "...";
+            // Safety check for substring
+            int cutIndex = Math.min(drawStr.length(), 15);
+            drawStr = drawStr.substring(0, cutIndex) + "...";
         }
         int tx = displayX + (displayW - fm.stringWidth(drawStr)) / 2;
         int ty = displayY + (displayH + fm.getAscent()) / 2 - 2;
