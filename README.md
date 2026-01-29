@@ -20,15 +20,7 @@
 ### Menus
 - Tela inicial com nome do jogo.  
 - Seleção entre **Tutorial** e **Iniciar**.  
-
-### Mecânicas Básicas
-- **Iniciar** → leva o jogador à primeira fase.  
-- Cada **rodada** = 3 apostas.  
-- O jogador vence a partir da **primeira rodada vencida**.  
-- O jogador pode escolher **sair** e ficar com o dinheiro ou seguir para o **modo infinito**.  
-- **Modo infinito**:  
-  - O jogador só pode sair após **2 rodadas vencidas** em diante.  
-  - Sempre possível sair apenas **na primeira aposta** da rodada.  
+ da rodada.  
 
 ### Mecânicas de Gameplay
 - Cada rodada entrega **52 cartas novas**.  
