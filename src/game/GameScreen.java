@@ -43,6 +43,12 @@ public class GameScreen extends Screen {
     private JButton rouletteCancelButton;
     private JButton rouletteContinueButton;
     
+    // Jukebox Radio Vars
+    private Rectangle radioPrevRect;
+    private Rectangle radioNextRect;
+    private String currentTrackName = "Track 01 - Jazz Noir";
+    private int currentTrackIndex = 1;
+    
     public GameScreen(ScreenManager screenManager) {
         super(screenManager);
         loadBackground();
@@ -110,6 +116,7 @@ public class GameScreen extends Screen {
             public void mousePressed(MouseEvent e) {
                 if (rouletteState == RouletteState.NONE) {
                     handleCardClick(e.getX(), e.getY());
+                    handleRadioClick(e.getPoint());
                 }
             }
         });
@@ -121,6 +128,22 @@ public class GameScreen extends Screen {
                 repaint();
             }
         });
+    }
+
+    private void handleRadioClick(Point p) {
+        if (radioPrevRect != null && radioPrevRect.contains(p)) {
+            // Previous track logic
+            currentTrackIndex--;
+            if (currentTrackIndex < 1) currentTrackIndex = 12;
+            currentTrackName = "Track " + String.format("%02d", currentTrackIndex) + " - Jazz Noir";
+            repaint();
+        } else if (radioNextRect != null && radioNextRect.contains(p)) {
+            // Next track logic
+            currentTrackIndex++;
+            if (currentTrackIndex > 12) currentTrackIndex = 1;
+            currentTrackName = "Track " + String.format("%02d", currentTrackIndex) + " - Jazz Noir";
+            repaint();
+        }
     }
     
     private void handleCardClick(int x, int y) {
@@ -886,11 +909,107 @@ public class GameScreen extends Screen {
         // --- Painel Direito (Dinheiro) ---
         drawMoneyPanel(g);
         
+        // --- Jukebox Radio ---
+        drawRadio(g);
+
         drawPlayerHand(g);
         
         if (rouletteState != RouletteState.NONE) {
             drawRouletteOverlay(g);
         }
+    }
+
+    private void drawRadio(Graphics2D g) {
+        // Posição: Abaixo do painel de estatísticas (Esquerda)
+        int width = 250;
+        int height = 80;
+        int x = 30; // Alinhado à esquerda (mesmo x do status panel)
+        int y = 230; // Abaixo do status panel (que vai até y=215) + margem
+        
+        // Background Metálico/Preto (Chassis)
+        GradientPaint metal = new GradientPaint(x, y, new Color(40, 40, 40), x, y + height, new Color(10, 10, 10));
+        g.setPaint(metal);
+        g.fillRoundRect(x, y, width, height, 10, 10);
+        g.setColor(new Color(150, 150, 150));
+        g.setStroke(new BasicStroke(3));
+        g.drawRoundRect(x, y, width, height, 10, 10);
+        
+        // Detalhe Cromado Frontal (Grade)
+        g.setColor(new Color(60, 60, 60));
+        for(int i=5; i<height-5; i+=4) {
+             g.drawLine(x+5, y+i, x+30, y+i); // Grade Esq
+             g.drawLine(x+width-30, y+i, x+width-5, y+i); // Grade Dir
+        }
+
+        // Knobs (Botões Giratórios nas pontas)
+        int knobSize = 35;
+        g.setColor(new Color(20, 20, 20));
+        g.fillOval(x + 10, y + (height - knobSize)/2, knobSize, knobSize); // Esq
+        g.fillOval(x + width - 10 - knobSize, y + (height - knobSize)/2, knobSize, knobSize); // Dir
+        // Brilho do Knob
+        g.setColor(new Color(80, 80, 80));
+        g.fillOval(x + 15, y + (height - knobSize)/2 + 5, knobSize-10, knobSize-10);
+        
+        // Display Central
+        int displayW = 120;
+        int displayH = 40;
+        int displayX = x + (width - displayW) / 2;
+        int displayY = y + 10;
+        
+        g.setColor(new Color(0, 20, 0)); // Fundo LCD escuro
+        g.fillRect(displayX, displayY, displayW, displayH);
+        g.setColor(new Color(50, 80, 50)); // Borda
+        g.drawRect(displayX, displayY, displayW, displayH);
+        
+        // Texto Display
+        g.setFont(new Font("Consolas", Font.BOLD, 12));
+        g.setColor(new Color(100, 255, 100)); // Verde Matrix
+        FontMetrics fm = g.getFontMetrics();
+        // Scroll simulado ou crop
+        String drawStr = currentTrackName;
+        if (fm.stringWidth(drawStr) > displayW - 10) {
+            drawStr = drawStr.substring(0, 12) + "...";
+        }
+        int tx = displayX + (displayW - fm.stringWidth(drawStr)) / 2;
+        int ty = displayY + (displayH + fm.getAscent()) / 2 - 2;
+        g.drawString(drawStr, tx, ty);
+        
+        // Botões Controles (Abaixo do display)
+        int btnW = 30;
+        int btnH = 20;
+        int btnY = displayY + displayH + 5;
+        int prevX = displayX;
+        int nextX = displayX + displayW - btnW;
+        
+        // Define Hitboxes
+        radioPrevRect = new Rectangle(prevX, btnY, btnW, btnH);
+        radioNextRect = new Rectangle(nextX, btnY, btnW, btnH);
+        
+        // Desenha botão Anterior
+        drawRadioButton(g, radioPrevRect, "<<");
+        
+        // Desenha botão Próximo
+        drawRadioButton(g, radioNextRect, ">>");
+        
+        // LED de Status
+        g.setColor(Color.RED);
+        g.fillOval(x + width - 50, y + 15, 6, 6);
+    }
+    
+    private void drawRadioButton(Graphics2D g, Rectangle rect, String symbol) {
+        boolean hover = mousePos != null && rect.contains(mousePos) && rouletteState == RouletteState.NONE;
+        
+        g.setColor(hover ? new Color(80, 80, 80) : new Color(40, 40, 40));
+        g.fill(rect);
+        g.setColor(new Color(150, 150, 150));
+        g.draw(rect);
+        
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Arial", Font.BOLD, 12));
+        FontMetrics fm = g.getFontMetrics();
+        int sx = rect.x + (rect.width - fm.stringWidth(symbol)) / 2;
+        int sy = rect.y + (rect.height + fm.getAscent()) / 2 - 2;
+        g.drawString(symbol, sx, sy);
     }
 
     private void drawRouletteOverlay(Graphics2D g) {
@@ -1083,44 +1202,81 @@ public class GameScreen extends Screen {
              }
 
         } else if (rouletteState == RouletteState.FIRING) {
-             // Mantém a imagem do revólver centralizada como base (sem shake agora, ou com muito shake se for tiro)
+             // Configurações base
+             int revW = 300;
+             int revH = 0;
              if (revolverImage != null) {
-                 int revW = 300;
-                 int revH = (int)((double)revW / revolverImage.getWidth(null) * revolverImage.getHeight(null));
-                 g.drawImage(revolverImage, cx - revW/2, cy - revH/2, revW, revH, null);
+                 revH = (int)((double)revW / revolverImage.getWidth(null) * revolverImage.getHeight(null));
              }
 
              if (roundDied) {
                  // --- Animação de Tiro (BANG) ---
-                 // Clarão laranja/amarelo piscando
-                 if (firingFrame % 4 < 2) { // Pisca rápido
-                     g.setColor(new Color(255, 200, 50, 180));
-                     g.fillOval(cx - 100, cy - 100, 200, 200);
-                     g.setColor(new Color(255, 255, 200, 200));
-                     g.fillOval(cx - 60, cy - 60, 120, 120);
+                 // Efeito de Recuo (Arma sobe e rotaciona levemente)
+                 int recoilY = -Math.min(firingFrame * 15, 60); // Sobe até 60px
+                 double recoilRot = Math.toRadians(-Math.min(firingFrame * 2, 10)); // Gira um pouco para trás
+                 
+                 Graphics2D gGun = (Graphics2D) g.create();
+                 gGun.translate(cx, cy + recoilY);
+                 gGun.rotate(recoilRot);
+                 if (revolverImage != null) {
+                    gGun.drawImage(revolverImage, -revW/2, -revH/2, revW, revH, null);
+                 }
+                 gGun.dispose();
+
+                 // Clarão do disparo (Explosão)
+                 if (firingFrame < 5) {
+                     int flashSize = 100 + firingFrame * 50;
+                     // Camada externa vermelha
+                     g.setColor(new Color(255, 50, 0, 200));
+                     g.fillOval(cx - flashSize, cy - flashSize - 40, flashSize * 2, flashSize * 2);
+                     // Miolo amarelo/branco
+                     g.setColor(new Color(255, 255, 100, 255));
+                     g.fillOval(cx - flashSize/2, cy - flashSize/2 - 40, flashSize, flashSize);
+                 } else {
+                     // Fumaça pós-tiro
+                     g.setColor(new Color(100, 100, 100, 150 - (firingFrame-5) * 10));
+                     g.fillOval(cx - 50, cy - 100 - firingFrame * 5, 100 + firingFrame * 2, 80 + firingFrame * 2);
                  }
                  
-                 // Texto Gigante
-                 g.setFont(new Font("Impact", Font.BOLD, 120));
-                 g.setColor(new Color(255, 50, 50));
-                 drawCenteredText(g, "BANG!", cy + 20);
+                 // Texto "BANG!" Vibrante
+                 int shakeX = (int)(Math.random() * 10 - 5);
+                 int shakeY = (int)(Math.random() * 10 - 5);
+                 g.setFont(new Font("Impact", Font.ITALIC | Font.BOLD, 120));
                  
-                 // Overlay vermelho piscando na tela toda
-                 g.setColor(new Color(255, 0, 0, 60 + (firingFrame % 5) * 20));
-                 g.fillRect(0, 0, getWidth(), getHeight());
+                 // Sombra do texto
+                 g.setColor(Color.BLACK);
+                 drawCenteredText(g, "BANG!", cy + 25 + shakeY);
+                 // Texto principal
+                 g.setColor(new Color(255, 20, 20));
+                 drawCenteredText(g, "BANG!", cy + 20 + shakeY);
+                 
+                 // Overlay de impacto (Tela vermelha piscando)
+                 if (firingFrame % 2 == 0) {
+                    g.setColor(new Color(255, 0, 0, 80));
+                    g.fillRect(0, 0, getWidth(), getHeight());
+                 }
                  
              } else {
                  // --- Animação de Falha (CLICK) ---
-                 // Pequeno balão ou texto saindo da arma
-                 g.setFont(new Font("Courier New", Font.BOLD, 40));
-                 g.setColor(new Color(200, 200, 200));
+                 // Arma apenas "soluça" (vibra rápido sem sair do lugar)
+                 int jiggleY = (firingFrame < 3) ? 5 : 0;
                  
-                 int yOffset = -(firingFrame * 2); // Texto sobe um pouco
-                 drawCenteredText(g, "* click *", cy - 100 + yOffset);
+                 if (revolverImage != null) {
+                     g.drawImage(revolverImage, cx - revW/2, cy - revH/2 + jiggleY, revW, revH, null);
+                 }
                  
-                 // Talvez um pequeno "puff" cinza
-                 g.setColor(new Color(100, 100, 100, 100 - firingFrame * 5));
-                 g.fillOval(cx + 80, cy - 80, 20 + firingFrame, 20 + firingFrame);
+                 // Texto "click" mais sutil e mecanizado
+                 g.setFont(new Font("Courier New", Font.BOLD, 32));
+                 g.setColor(new Color(180, 180, 180));
+                 
+                 int textY = cy - 80 - firingFrame * 2;
+                 drawCenteredText(g, "* click *", textY);
+                 
+                 // "Puff" minúsculo de mecanismo seco
+                 if (firingFrame < 10) {
+                     g.setColor(new Color(200, 200, 200, 100 - firingFrame * 10));
+                     g.drawOval(cx - 10 - firingFrame, cy - 60 - firingFrame, 20 + firingFrame*2, 20 + firingFrame*2);
+                 }
              }
 
         } else if (rouletteState == RouletteState.RESULT) {
