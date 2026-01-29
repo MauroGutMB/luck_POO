@@ -27,7 +27,7 @@ public class MenuScreen extends Screen {
      */
     private void loadBackground() {
         try {
-            backgroundImage = ImageIO.read(new File("assets/bg-menu.png"));
+            backgroundImage = ImageIO.read(getClass().getResourceAsStream("/assets/bg-menu.png"));
         } catch (IOException e) {
             System.err.println("Erro ao carregar imagem de fundo: " + e.getMessage());
             backgroundImage = null;

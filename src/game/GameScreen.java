@@ -136,8 +136,8 @@ public class GameScreen extends Screen {
     
     private void loadBackground() {
         try {
-            backgroundImage = ImageIO.read(new File("assets/bg-game.png"));
-            revolverImage = ImageIO.read(new File("assets/revolver.png"));
+            backgroundImage = ImageIO.read(getClass().getResourceAsStream("/assets/bg-game.png"));
+            revolverImage = ImageIO.read(getClass().getResourceAsStream("/assets/revolver.png"));
         } catch (IOException e) {
             System.err.println("Erro ao carregar assets: " + e.getMessage());
         }

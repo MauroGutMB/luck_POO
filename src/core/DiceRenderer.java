@@ -26,7 +26,7 @@ public class DiceRenderer {
 
     private void loadSpriteSheet() {
         try {
-            spriteSheet = ImageIO.read(new File("assets/dados.png"));
+            spriteSheet = ImageIO.read(getClass().getResourceAsStream("/assets/dados.png"));
             if (spriteSheet != null) {
                 int w = spriteSheet.getWidth();
                 int h = spriteSheet.getHeight();

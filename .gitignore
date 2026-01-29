@@ -1,3 +1,4 @@
 # arquivos de compilação
 *.class
 bin/
+target/

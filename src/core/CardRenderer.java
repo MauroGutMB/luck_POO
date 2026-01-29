@@ -38,7 +38,7 @@ public class CardRenderer {
     
     private void loadSpriteSheet() {
         try {
-            cardSpriteSheet = ImageIO.read(new File("assets/cartas.png"));
+            cardSpriteSheet = ImageIO.read(getClass().getResourceAsStream("/assets/cartas.png"));
             System.out.println("Sprite sheet de cartas carregado!");
         } catch (IOException e) {
             System.err.println("Erro ao carregar sprite sheet de cartas: " + e.getMessage());

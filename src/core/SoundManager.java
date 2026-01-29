@@ -1,7 +1,7 @@
 package core;
 
 import javax.sound.sampled.*;
-import java.io.File;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -28,13 +28,20 @@ public class SoundManager {
     private SoundManager() {
         // Load menu music
         try {
-            File musicFile = new File("musics/menu_os.wav");
-            if (!musicFile.exists()) {
-                musicFile = new File("musics/menu_st.wav");
+            AudioInputStream audioInput = null;
+            try {
+                InputStream is = getClass().getResourceAsStream("/musics/menu_os.wav");
+                if (is != null) {
+                    audioInput = AudioSystem.getAudioInputStream(new BufferedInputStream(is));
+                }
+            } catch (Exception e) {
+                InputStream is = getClass().getResourceAsStream("/musics/menu_st.wav");
+                if (is != null) {
+                    audioInput = AudioSystem.getAudioInputStream(new BufferedInputStream(is));
+                }
             }
             
-            if (musicFile.exists()) {
-                AudioInputStream audioInput = AudioSystem.getAudioInputStream(musicFile);
+            if (audioInput != null) {
                 menuMusic = AudioSystem.getClip();
                 menuMusic.open(audioInput);
             }
@@ -47,27 +54,25 @@ public class SoundManager {
     
     private void setupRadioPlaylist() {
         radioPlaylist = new ArrayList<>();
-        File musicDir = new File("musics");
-        if (!musicDir.exists() || !musicDir.isDirectory()) {
-            System.out.println("Pasta de músicas não encontrada: musics/");
-            return;
-        }
         
-        File[] files = musicDir.listFiles((dir, name) -> name.toLowerCase().endsWith(".wav"));
-        if (files == null || files.length == 0) {
-            return;
-        }
+        // Load from resources inside JAR
+        String[] musicFiles = {
+            "/musics/audio-club-amapiano-319840.wav",
+            "/musics/memphis-trap-wav-349366.wav",
+            "/musics/tokyo-rain-serenade-archer-sounds-321180.wav",
+            "/musics/warm-nights-amp-lofi-dreams-archer-sounds-321177.wav"
+        };
         
-        Arrays.sort(files, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
-        for (File f : files) {
-            String name = f.getName().toLowerCase();
-            if (name.equals("menu_st.wav")) {
-                continue; // excluir música do menu
+        for (String path : musicFiles) {
+            try {
+                if (getClass().getResourceAsStream(path) != null) {
+                    // We'll store the path as string and load on demand
+                    File tempFile = new File(path); // Just to store reference
+                    radioPlaylist.add(tempFile);
+                }
+            } catch (Exception e) {
+                System.out.println("Could not load: " + path);
             }
-            if (name.equals("ya-feel-me-something-i-just-threw-together-416838.wav")) {
-                continue; // música removida
-            }
-            radioPlaylist.add(f);
         }
     }
 
@@ -188,7 +193,13 @@ public class SoundManager {
         
         try {
             File track = radioPlaylist.get(index);
-            AudioInputStream audioInput = AudioSystem.getAudioInputStream(track);
+            String resourcePath = track.getPath().replace("\\", "/");
+            InputStream is = getClass().getResourceAsStream(resourcePath);
+            if (is == null) {
+                System.err.println("Resource not found: " + resourcePath);
+                return;
+            }
+            AudioInputStream audioInput = AudioSystem.getAudioInputStream(new BufferedInputStream(is));
             radioClip = AudioSystem.getClip();
             radioClip.open(audioInput);
             
