@@ -56,15 +56,21 @@ public class ScreenManager {
     private void updateTransition() {
         if (isFadingOut) {
             alpha += FADE_SPEED;
+            SoundManager.getInstance().setFadeFactor(Math.max(0.0f, 1.0f - alpha));
+            
             if (alpha >= 1.0f) {
                 alpha = 1.0f;
+                SoundManager.getInstance().setFadeFactor(0.0f);
                 isFadingOut = false;
                 performScreenChange(pendingScreenName);
             }
         } else {
             alpha -= FADE_SPEED;
+            SoundManager.getInstance().setFadeFactor(Math.max(0.0f, 1.0f - alpha));
+            
             if (alpha <= 0.0f) {
                 alpha = 0.0f;
+                SoundManager.getInstance().setFadeFactor(1.0f);
                 transitionTimer.stop();
                 overlayPanel.setVisible(false);
             }
@@ -101,6 +107,13 @@ public class ScreenManager {
     
     private void performScreenChange(String name) {
         Screen newScreen = screens.get(name);
+        
+        // Lógica de Música
+        if (name.equals("game")) {
+            SoundManager.getInstance().stopMenuMusic();
+        } else {
+            SoundManager.getInstance().playMenuMusic();
+        }
         
         if (currentScreen != null) {
             frame.remove(currentScreen);

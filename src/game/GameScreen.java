@@ -409,7 +409,7 @@ public class GameScreen extends Screen {
         }
         currentSpinVelocity = 40.0; // Velocidade inicial alta
         spinStartTime = System.currentTimeMillis();
-        cylinderAngle = 0;
+        cylinderAngle = Math.random() * 360.0;
         
         // Timer de física (60 FPS aprox)
         physicsTimer = new Timer(16, new ActionListener() {

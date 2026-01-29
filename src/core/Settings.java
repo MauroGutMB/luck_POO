@@ -29,6 +29,6 @@ public class Settings {
     public void setVolume(int volume) {
         this.volume = Math.max(0, Math.min(100, volume));
         System.out.println("Volume ajustado para: " + this.volume + "%");
-        // Aqui você pode adicionar lógica para ajustar o volume do som
+        SoundManager.getInstance().updateVolume();
     }
 }

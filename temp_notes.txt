@@ -1,4 +1,0 @@
-// Placeholder for a method insertion tool call if needed later.
-// The previous replace_string_in_file failed because I tried to replace the method with itself (essentially checking if it existed or I pasted it wrong, but I hadn't pasted it yet in the previous successful edits). 
-// Actually, looking at the history, I hadn't defined drawCylinder yet. I used it in the replace call but the method definition wasn't added thereto.
-// I need to add the helper method `drawCylinder` at the end or somewhere appropriate.
