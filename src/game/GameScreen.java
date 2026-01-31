@@ -15,6 +15,7 @@ import java.util.List;
  */
 public class GameScreen extends Screen {
     private Image backgroundImage;
+    private Image deckImage;
     private Image revolverImage;
     private GameState gameState;
     private CardRenderer cardRenderer;
@@ -137,6 +138,7 @@ public class GameScreen extends Screen {
     private void loadBackground() {
         try {
             backgroundImage = ImageIO.read(getClass().getResourceAsStream("/assets/bg-game.png"));
+            deckImage = ImageIO.read(getClass().getResourceAsStream("/assets/red_deck.png"));
             revolverImage = ImageIO.read(getClass().getResourceAsStream("/assets/revolver.png"));
         } catch (IOException e) {
             System.err.println("Erro ao carregar assets: " + e.getMessage());
@@ -1007,6 +1009,9 @@ public class GameScreen extends Screen {
         // --- Jukebox Radio ---
         drawRadio(g);
 
+        // --- Deck Draw ---
+        drawDeck(g);
+
         drawPlayerHand(g);
         
         if (rouletteState != RouletteState.NONE) {
@@ -1702,6 +1707,47 @@ public class GameScreen extends Screen {
         g.drawString(moneyText, x + (width - textWidth) / 2, y + 35);
     }
     
+    private void drawDeck(Graphics2D g) {
+        if (deckImage == null) return;
+        
+        int x = 840;
+        int y = 350;
+        int width = 110;
+        int height = 150;
+        
+        g.drawImage(deckImage, x, y, width, height, this);
+        
+        // Contador
+        String count = String.valueOf(gameState.getGameDeck().getRemainingCards());
+        g.setFont(new Font("Arial", Font.BOLD, 36));
+        FontMetrics fm = g.getFontMetrics();
+        int textW = fm.stringWidth(count);
+        int textH = fm.getAscent();
+        
+        int tx = x + (width - textW) / 2;
+        int ty = y + (height + textH) / 2 - 5;
+        
+        // Outline text
+        g.setColor(Color.BLACK);
+        for(int i=-2; i<=2; i++) {
+            for(int j=-2; j<=2; j++) {
+                if(i!=0 || j!=0) g.drawString(count, tx+i, ty+j);
+            }
+        }
+        g.setColor(Color.WHITE);
+        g.drawString(count, tx, ty);
+        
+        // Label opcional acima
+        g.setFont(new Font("Arial", Font.BOLD, 14));
+        String label = "DECK";
+        int lx = x + (width - g.getFontMetrics().stringWidth(label))/2;
+        int ly = y - 8;
+        g.setColor(Color.BLACK);
+        g.drawString(label, lx+1, ly+1);
+        g.setColor(new Color(200, 200, 200));
+        g.drawString(label, lx, ly);
+    }
+
     private void drawPlayerHand(Graphics2D g) {
         List<PlayingCard> hand = gameState.getPlayerHand();
         
