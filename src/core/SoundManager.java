@@ -29,15 +29,14 @@ public class SoundManager {
         // Load menu music
         try {
             AudioInputStream audioInput = null;
-            try {
-                InputStream is = getClass().getResourceAsStream("/musics/menu_os.wav");
-                if (is != null) {
-                    audioInput = AudioSystem.getAudioInputStream(new BufferedInputStream(is));
-                }
-            } catch (Exception e) {
-                InputStream is = getClass().getResourceAsStream("/musics/menu_st.wav");
-                if (is != null) {
-                    audioInput = AudioSystem.getAudioInputStream(new BufferedInputStream(is));
+            InputStream is = getClass().getResourceAsStream("/musics/menu_os.wav");
+            if (is != null) {
+                audioInput = AudioSystem.getAudioInputStream(new BufferedInputStream(is));
+            }
+            if (audioInput == null) {
+                InputStream fallback = getClass().getResourceAsStream("/musics/menu_st.wav");
+                if (fallback != null) {
+                    audioInput = AudioSystem.getAudioInputStream(new BufferedInputStream(fallback));
                 }
             }
             
