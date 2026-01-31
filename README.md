@@ -23,7 +23,7 @@
 
 **Packar:**
 
- jpackage --name "LUCK" --input target --main-jar LUCK-1.0-SNAPSHOT.jar --type app-image --dest saida
+ jpackage --name "LUCK" --input target --main-jar LUCK-1.0-SNAPSHOT.jar --type app-image --icon assets/revolver.ico --dest saida
 
 ## Funcionalidades
 
