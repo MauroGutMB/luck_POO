@@ -1,4 +1,17 @@
-# arquivos de compilação
+# arquivos e pastas de compilação
 *.class
+*.jar
+*.exe
+
+# pastas de binários/build
 bin/
 target/
+
+# caches de IDE/build
+.classpath
+.project
+.settings/
+.idea/
+.vscode/
+.gradle/
+*.iml

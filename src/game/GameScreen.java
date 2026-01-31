@@ -208,7 +208,9 @@ public class GameScreen extends Screen {
         
         if (gameState.getPlayerHand().isEmpty()) {
             gameState.startNewRound();
-            dealInitialHand();
+            if (!dealInitialHand()) {
+                return;
+            }
         }
         
         updateCardAreas();
@@ -233,17 +235,18 @@ public class GameScreen extends Screen {
         repaint();
     }
     
-    private void dealInitialHand() {
+    private boolean dealInitialHand() {
         gameState.getPlayerHand().clear();
         List<PlayingCard> cards = gameState.getGameDeck().draw(8);
         
-        if (cards.size() < 8) {
+        if (cards.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Deck vazio! O jogo acabou.", "Fim de Jogo", JOptionPane.WARNING_MESSAGE);
             showGameOverScreen();
-            return;
+            return false;
         }
         
         gameState.getPlayerHand().addAll(cards);
+        return true;
     }
     
     private void updateCardAreas() {
@@ -304,6 +307,13 @@ public class GameScreen extends Screen {
         // Consome as cartas jogadas
         gameState.getPlayerHand().removeAll(gameState.getSelectedCards());
         gameState.getGameDeck().discard(gameState.getSelectedCards());
+
+        // Se a mão ficou vazia, puxa novas cartas do deck
+        if (gameState.getPlayerHand().isEmpty()) {
+            if (!dealInitialHand()) {
+                return;
+            }
+        }
         
         gameState.incrementHandsPlayed();
         
@@ -599,7 +609,7 @@ public class GameScreen extends Screen {
         
         if (cardsToDraw > 0) {
             List<PlayingCard> newCards = gameState.getGameDeck().draw(cardsToDraw);
-            if (newCards.size() < cardsToDraw) {
+            if (newCards.isEmpty() && gameState.getPlayerHand().isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Deck vazio! O jogo acabou.", "Fim de Jogo", JOptionPane.WARNING_MESSAGE);
                 showGameOverScreen();
                 return;
@@ -886,7 +896,9 @@ public class GameScreen extends Screen {
             if (isSuccess) {
                 if (gameState.getCurrentBlind() < 3) {
                     gameState.nextBlind();
-                    dealInitialHand();
+                    if (!dealInitialHand()) {
+                        return;
+                    }
                     initialize();
                 } else {
                     endRound();
