@@ -49,6 +49,9 @@ public class GameScreen extends Screen {
     private Timer physicsTimer; // Timer específico para física do giro
     private String rouletteResultText = "";
     private boolean rouletteSuccess = false;
+    private double spinCoverAlpha = 0.0;
+    private double spinMaxVelocity = 1.0;
+    private long bulletRevealUntil = 0;
     private JButton rouletteConfirmButton;
     private JButton rouletteCancelButton;
     private JButton rouletteContinueButton;
@@ -436,6 +439,9 @@ public class GameScreen extends Screen {
             spinsUsed++;
         }
         currentSpinVelocity = 40.0; // Velocidade inicial alta
+        spinMaxVelocity = currentSpinVelocity;
+        spinCoverAlpha = 0.0;
+        bulletRevealUntil = System.currentTimeMillis() + 350;
         spinStartTime = System.currentTimeMillis();
         cylinderAngle = Math.random() * 360.0;
         
@@ -459,6 +465,10 @@ public class GameScreen extends Screen {
          currentSpinVelocity += 15.0;
          // Limita a velocidade máxima
          if (currentSpinVelocity > 80.0) currentSpinVelocity = 80.0;
+            if (currentSpinVelocity > spinMaxVelocity) {
+                 spinMaxVelocity = currentSpinVelocity;
+            }
+            bulletRevealUntil = System.currentTimeMillis() + 250;
     }
     
     private void updateSpinPhysics() {
@@ -467,6 +477,9 @@ public class GameScreen extends Screen {
         
         // Atrito (Friction)
         currentSpinVelocity *= 0.985;
+        double normalized = currentSpinVelocity / Math.max(spinMaxVelocity, 1.0);
+        double t = Math.max(0.0, Math.min(1.0, 1.0 - normalized));
+        spinCoverAlpha = Math.pow(t, 0.6); // fecha mais rápido para ocultar as balas
         
         long elapsed = System.currentTimeMillis() - spinStartTime;
         boolean minTimePassed = elapsed > 3000;
@@ -1210,7 +1223,7 @@ public class GameScreen extends Screen {
              drawCenteredText(g, "Pronto para Girar!", cy - 200);
              
              drawRouletteHUD(g, cx, cy); // HUD lateral
-             drawClosedDrumOverlay(g, cx, cy, 0); 
+             drawClosedDrumOverlay(g, cx, cy, 0, 0.0, true, false); 
 
              rouletteConfirmButton.setBounds(cx - 100, cy + 150, 200, 50);
              if (rouletteConfirmButton.getParent() != this) {
@@ -1227,7 +1240,8 @@ public class GameScreen extends Screen {
              drawCenteredText(g, "Girando...", cy - 200);
              
              drawRouletteHUD(g, cx, cy); // HUD lateral
-             drawClosedDrumOverlay(g, cx, cy, cylinderAngle);
+                boolean revealBullets = System.currentTimeMillis() < bulletRevealUntil || spinCoverAlpha < 0.35;
+                 drawClosedDrumOverlay(g, cx, cy, cylinderAngle, spinCoverAlpha, revealBullets, false);
 
              rouletteConfirmButton.setBounds(cx - 100, cy + 150, 200, 50);
              if (rouletteConfirmButton.getParent() != this) {
@@ -1244,7 +1258,7 @@ public class GameScreen extends Screen {
              drawCenteredText(g, "PRONTO PARA ATIRAR", cy - 200);
              
              drawRouletteHUD(g, cx, cy); // HUD lateral
-             drawClosedDrumOverlay(g, cx, cy, cylinderAngle);
+             drawClosedDrumOverlay(g, cx, cy, cylinderAngle, 1.0, false, true);
 
              rouletteConfirmButton.setBounds(cx - 100, cy + 150, 200, 50);
              if (rouletteConfirmButton.getParent() != this) {
@@ -1452,7 +1466,7 @@ public class GameScreen extends Screen {
         g.drawString(spinStr, rightX + (panelW - spinW)/2, panelY + 70);
     }
     
-    private void drawClosedDrumOverlay(Graphics2D g, int cx, int cy, double angle) {
+    private void drawClosedDrumOverlay(Graphics2D g, int cx, int cy, double angle, double opacity, boolean revealBullets, boolean keepChambersVisible) {
         int cylRadius = 120;
         int holeDist = 70;
         int holeRadius = 25;
@@ -1466,7 +1480,7 @@ public class GameScreen extends Screen {
         gRot.setColor(new Color(40, 40, 40)); 
         gRot.fillOval(cx - cylRadius, cy - cylRadius, cylRadius * 2, cylRadius * 2);
         
-        // Desenha os 6 chambers como pretos (sem revelar nada)
+           // Desenha os 6 chambers (com balas opcionais)
         for (int i = 0; i < 6; i++) {
              double theta = Math.toRadians(i * 60 - 90);
              int hx = cx + (int)(Math.cos(theta) * holeDist);
@@ -1475,6 +1489,13 @@ public class GameScreen extends Screen {
              // Chamber Preto (Buraco Escuro)
              gRot.setColor(Color.BLACK);
              gRot.fillOval(hx - holeRadius, hy - holeRadius, holeRadius * 2, holeRadius * 2);
+
+               if (revealBullets && i < diceAnimationResult) {
+                  gRot.setColor(new Color(218, 165, 32));
+                  gRot.fillOval(hx - holeRadius + 2, hy - holeRadius + 2, holeRadius * 2 - 4, holeRadius * 2 - 4);
+                  gRot.setColor(new Color(180, 180, 180));
+                  gRot.fillOval(hx - 8, hy - 8, 16, 16);
+               }
              
              // Pequena borda interna para definição visual
              gRot.setColor(new Color(60, 60, 60, 100));
@@ -1485,10 +1506,25 @@ public class GameScreen extends Screen {
         gRot.dispose();
         
         // --- 2. A Película Cinza por Cima (Film Overlay) ---
-        // Desenha uma camada semi-transparente sobre o tambor giratório para dar o efeito "fechado"
-        // mas mantendo os buracos pretos visíveis por baixo (contraste)
-        g.setColor(new Color(60, 60, 60, 150)); // Cinza semi-transparente
+        // Transparência varia durante o giro para esconder as munições no final
+        int maxAlpha = 255;
+        int filmAlpha = (int)(Math.max(0.0, Math.min(1.0, opacity)) * maxAlpha);
+        g.setColor(new Color(60, 60, 60, filmAlpha)); // Cinza variável
         g.fillOval(cx - cylRadius, cy - cylRadius, cylRadius * 2, cylRadius * 2);
+
+        if (keepChambersVisible) {
+            for (int i = 0; i < 6; i++) {
+                double theta = Math.toRadians(i * 60 - 90);
+                int hx = cx + (int)(Math.cos(theta) * holeDist);
+                int hy = cy + (int)(Math.sin(theta) * holeDist);
+                
+                g.setColor(new Color(10, 10, 10, 220));
+                g.fillOval(hx - holeRadius, hy - holeRadius, holeRadius * 2, holeRadius * 2);
+                g.setColor(new Color(80, 80, 80, 180));
+                g.setStroke(new BasicStroke(2));
+                g.drawOval(hx - holeRadius, hy - holeRadius, holeRadius * 2, holeRadius * 2);
+            }
+        }
         
         // Borda do tambor fechado
         g.setColor(new Color(30, 30, 30));
