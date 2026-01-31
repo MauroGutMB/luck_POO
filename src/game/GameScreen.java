@@ -461,6 +461,10 @@ public class GameScreen extends Screen {
                rouletteConfirmButton.setText("SEM GIROS");
                return;
             }
+                if (getCurrentBulletCount() <= 1) {
+                    rouletteConfirmButton.setText("SEM BALAS");
+                    return;
+                }
             spinsUsed++;
          currentSpinVelocity += 15.0;
          // Limita a velocidade máxima
@@ -549,8 +553,9 @@ public class GameScreen extends Screen {
     
     private void resolveRussianRoulette() {
         // Verificar se houve disparo baseado no slot que parou
-        // Slots 0 até diceAnimationResult-1 estão carregados.
-        roundDied = finalChamberSlot < diceAnimationResult;
+        // Slots 0 até bullets-1 estão carregados.
+        int bullets = getCurrentBulletCount();
+        roundDied = finalChamberSlot < bullets;
         
         rouletteState = RouletteState.FIRING;
         firingFrame = 0;
@@ -1422,10 +1427,11 @@ public class GameScreen extends Screen {
         double baseBonus = Math.pow(diceAnimationResult + 1, 2);
         int penaltySpins = Math.max(0, spinsUsed - 1);
         double currentBonus = baseBonus * Math.pow(0.5, penaltySpins);
+        int bullets = getCurrentBulletCount();
 
         // --- Painel ESQUERDO (Multiplicador) ---
         int panelW = 180;
-        int panelH = 100;
+        int panelH = 120;
         int leftX = cx - 350; 
         int panelY = cy - 50; 
 
@@ -1444,6 +1450,10 @@ public class GameScreen extends Screen {
         String bonusStr = String.format("%.2f", currentBonus) + "x";
         FontMetrics fm = g.getFontMetrics();
         g.drawString(bonusStr, leftX + (panelW - fm.stringWidth(bonusStr))/2, panelY + 70);
+
+        g.setFont(new Font("Arial", Font.BOLD, 14));
+        g.setColor(new Color(220, 220, 220));
+        g.drawString("BALAS: " + bullets, leftX + 15, panelY + 100);
         
         // --- Painel DIREITO (Giros) ---
         int rightX = cx + 170; 
@@ -1451,7 +1461,8 @@ public class GameScreen extends Screen {
         g.setColor(new Color(20, 20, 30, 220));
         g.fillRoundRect(rightX, panelY, panelW, panelH, 20, 20);
         
-        Color spinColor = (spinsUsed >= MAX_SPINS) ? new Color(255, 80, 80) : new Color(100, 200, 255);
+        boolean noBulletsToSpin = bullets <= 1;
+        Color spinColor = (spinsUsed >= MAX_SPINS || noBulletsToSpin) ? new Color(255, 80, 80) : new Color(100, 200, 255);
         g.setColor(spinColor);
         g.drawRoundRect(rightX, panelY, panelW, panelH, 20, 20);
 
@@ -1464,6 +1475,14 @@ public class GameScreen extends Screen {
         String spinStr = (MAX_SPINS - spinsUsed) + " / " + MAX_SPINS;
         int spinW = g.getFontMetrics().stringWidth(spinStr);
         g.drawString(spinStr, rightX + (panelW - spinW)/2, panelY + 70);
+
+        if (noBulletsToSpin) {
+            g.setFont(new Font("Arial", Font.BOLD, 14));
+            g.setColor(new Color(255, 180, 180));
+            String warn = "SEM BALAS";
+            int warnW = g.getFontMetrics().stringWidth(warn);
+            g.drawString(warn, rightX + (panelW - warnW)/2, panelY + 100);
+        }
     }
     
     private void drawClosedDrumOverlay(Graphics2D g, int cx, int cy, double angle, double opacity, boolean revealBullets, boolean keepChambersVisible) {
@@ -1490,7 +1509,7 @@ public class GameScreen extends Screen {
              gRot.setColor(Color.BLACK);
              gRot.fillOval(hx - holeRadius, hy - holeRadius, holeRadius * 2, holeRadius * 2);
 
-               if (revealBullets && i < diceAnimationResult) {
+                 if (revealBullets && i < getCurrentBulletCount()) {
                   gRot.setColor(new Color(218, 165, 32));
                   gRot.fillOval(hx - holeRadius + 2, hy - holeRadius + 2, holeRadius * 2 - 4, holeRadius * 2 - 4);
                   gRot.setColor(new Color(180, 180, 180));
@@ -1551,6 +1570,11 @@ public class GameScreen extends Screen {
         g.setFont(new Font("Arial", Font.BOLD, 14));
         g.setColor(new Color(255, 100, 100));
         drawCenteredText(g, "ALVO", arrowY - 25);
+    }
+
+    private int getCurrentBulletCount() {
+        int removed = Math.max(0, spinsUsed - 1); // giros 2 e 3 removem 1 bala cada
+        return Math.max(1, diceAnimationResult - removed);
     }
 
     private void drawCylinder(Graphics2D g, int cx, int cy, double angle, int bulletsLoaded) {
