@@ -15,6 +15,7 @@ public class SoundManager {
     private float globalFadeFactor = 1.0f; // Managed by ScreenManager for transitions
     private boolean isMenuMusicPlaying = false;
     private boolean isRadioPlaying = false;
+    private boolean muted = false;
     private Timer menuFadeTimer;
     private float menuLocalVolume = 1.0f; // Fade-in do menu
     
@@ -234,7 +235,7 @@ public class SoundManager {
 
     public void updateVolume() {
         int globalSettingsVolume = Settings.getInstance().getVolume();
-        float baseVolume = (globalSettingsVolume / 100.0f);
+        float baseVolume = muted ? 0.0f : (globalSettingsVolume / 100.0f);
         
         // Calculate final volumes
         float menuFinal = baseVolume * globalFadeFactor * menuLocalVolume;
@@ -244,6 +245,15 @@ public class SoundManager {
         
         if (menuMusic != null) setClipVolume(menuMusic, menuFinal);
         if (radioClip != null) setClipVolume(radioClip, radioFinal);
+    }
+
+    public void toggleMute() {
+        muted = !muted;
+        updateVolume();
+    }
+
+    public boolean isMuted() {
+        return muted;
     }
 
     private void setClipVolume(Clip clip, float volume) {

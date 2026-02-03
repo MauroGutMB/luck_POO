@@ -4,7 +4,6 @@ import core.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.io.File;
 import java.io.IOException;
 import javax.imageio.ImageIO;
 import java.util.ArrayList;
@@ -16,6 +15,7 @@ import java.util.List;
 public class GameScreen extends Screen {
     private Image backgroundImage;
     private Image deckImage;
+    private Image pauseImage;
     private Image revolverImage;
     private GameState gameState;
     private CardRenderer cardRenderer;
@@ -55,6 +55,11 @@ public class GameScreen extends Screen {
     private JButton rouletteConfirmButton;
     private JButton rouletteCancelButton;
     private JButton rouletteContinueButton;
+    private JButton pauseButton;
+    private JButton pauseResumeButton;
+    private JButton pauseMuteButton;
+    private JButton pauseExitButton;
+    private boolean paused = false;
     private boolean rouletteSixPenalty = false;
     
     // Jukebox Radio Vars
@@ -72,6 +77,7 @@ public class GameScreen extends Screen {
         this.mousePos = new Point(0, 0);
         setupMouseListeners();
         setupRouletteButtons();
+        setupPauseButton();
     }
     
     private void setupRouletteButtons() {
@@ -101,6 +107,7 @@ public class GameScreen extends Screen {
         rouletteCancelButton = createActionButton("CANCELAR", 0, 0, new Color(120, 120, 120));
         rouletteCancelButton.addActionListener(e -> {
             rouletteState = RouletteState.NONE;
+            updatePauseAvailability();
             setGameButtonsEnabled(true);
             removeAll(); // Limpa botões antigos
             add(playButton);
@@ -114,6 +121,7 @@ public class GameScreen extends Screen {
         rouletteContinueButton = createActionButton("CONTINUAR", 0, 0, new Color(46, 204, 113));
         rouletteContinueButton.addActionListener(e -> {
             rouletteState = RouletteState.NONE;
+            updatePauseAvailability();
             if (rouletteSuccess) {
                 if (rouletteSixPenalty) {
                     setGameButtonsEnabled(true);
@@ -127,12 +135,134 @@ public class GameScreen extends Screen {
         });
     }
 
+    private void setupPauseButton() {
+        pauseButton = new JButton() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                if (pauseImage != null) {
+                    g.drawImage(pauseImage, 0, 0, getWidth(), getHeight(), null);
+                }
+            }
+        };
+        pauseButton.setOpaque(false);
+        pauseButton.setContentAreaFilled(false);
+        pauseButton.setBorderPainted(false);
+        pauseButton.setFocusPainted(false);
+        pauseButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        pauseButton.addActionListener(e -> togglePause());
+
+        setupPauseMenuButtons();
+        updatePauseAvailability();
+    }
+
+    private void setupPauseMenuButtons() {
+        pauseResumeButton = createActionButton("RETORNAR AO JOGO", 0, 0, new Color(39, 174, 96));
+        pauseResumeButton.addActionListener(e -> togglePause());
+        pauseResumeButton.setVisible(false);
+        add(pauseResumeButton);
+
+        pauseMuteButton = createActionButton("ATIVAR MUDO", 0, 0, new Color(52, 152, 219));
+        pauseMuteButton.addActionListener(e -> {
+            SoundManager sm = SoundManager.getInstance();
+            sm.toggleMute();
+            updatePauseMenuButtons();
+        });
+        pauseMuteButton.setVisible(false);
+        add(pauseMuteButton);
+
+        pauseExitButton = createActionButton("SAIR DA PARTIDA", 0, 0, new Color(231, 76, 60));
+        pauseExitButton.addActionListener(e -> {
+            if (paused) {
+                paused = false;
+                hidePauseMenuButtons();
+            }
+            setGameButtonsEnabled(true);
+            screenManager.changeScreen("menu");
+        });
+        pauseExitButton.setVisible(false);
+        add(pauseExitButton);
+    }
+
+    private void updatePauseMenuButtons() {
+        if (pauseMuteButton != null) {
+            boolean isMuted = SoundManager.getInstance().isMuted();
+            pauseMuteButton.setText(isMuted ? "DESATIVAR MUDO" : "ATIVAR MUDO");
+        }
+    }
+
+    private void showPauseMenuButtons() {
+        int panelWidth = 380;
+        int panelHeight = 300;
+        int panelX = (getWidth() - panelWidth) / 2;
+        int panelY = (getHeight() - panelHeight) / 2;
+        int btnWidth = 260;
+        int btnHeight = 48;
+        int btnX = panelX + (panelWidth - btnWidth) / 2;
+        int btnY = panelY + 110;
+        int gap = 15;
+
+        if (pauseResumeButton != null) {
+            pauseResumeButton.setBounds(btnX, btnY, btnWidth, btnHeight);
+            pauseResumeButton.setVisible(true);
+        }
+        if (pauseMuteButton != null) {
+            pauseMuteButton.setBounds(btnX, btnY + btnHeight + gap, btnWidth, btnHeight);
+            pauseMuteButton.setVisible(true);
+        }
+        if (pauseExitButton != null) {
+            pauseExitButton.setBounds(btnX, btnY + (btnHeight + gap) * 2, btnWidth, btnHeight);
+            pauseExitButton.setVisible(true);
+        }
+        updatePauseMenuButtons();
+        repaint();
+    }
+
+    private void hidePauseMenuButtons() {
+        if (pauseResumeButton != null) pauseResumeButton.setVisible(false);
+        if (pauseMuteButton != null) pauseMuteButton.setVisible(false);
+        if (pauseExitButton != null) pauseExitButton.setVisible(false);
+        repaint();
+    }
+
+    private void updatePauseAvailability() {
+        if (pauseButton == null) return;
+        boolean allowPause = rouletteState == RouletteState.NONE && !paused;
+        pauseButton.setEnabled(allowPause);
+    }
+
+    private void togglePause() {
+        paused = !paused;
+        setGameButtonsEnabled(paused ? false : rouletteState == RouletteState.NONE);
+        if (paused) {
+            if (physicsTimer != null) {
+                physicsTimer.stop();
+            }
+            if (diceTimer != null) {
+                diceTimer.stop();
+            }
+            showPauseMenuButtons();
+        } else {
+            if (rouletteState == RouletteState.SPINNING && physicsTimer != null) {
+                physicsTimer.start();
+            }
+            if (rouletteState == RouletteState.ROLLING && diceTimer != null) {
+                diceTimer.start();
+            }
+            hidePauseMenuButtons();
+        }
+        updatePauseAvailability();
+        repaint();
+    }
+
     private void setGameButtonsEnabled(boolean enabled) {
+        updatePauseAvailability();
         playButton.setEnabled(enabled);
         discardButton.setEnabled(enabled);
         // Desabilita visualmente se necessário, ou apenas lógica
         for(Component c : getComponents()) {
-            if (c instanceof JButton && c != rouletteConfirmButton && c != rouletteCancelButton && c != rouletteContinueButton) {
+            if (c instanceof JButton && c != rouletteConfirmButton && c != rouletteCancelButton && c != rouletteContinueButton
+                    && c != pauseResumeButton && c != pauseMuteButton && c != pauseExitButton) {
                 c.setEnabled(enabled);
             }
         }
@@ -142,6 +272,7 @@ public class GameScreen extends Screen {
         try {
             backgroundImage = ImageIO.read(getClass().getResourceAsStream("/assets/bg-game.png"));
             deckImage = ImageIO.read(getClass().getResourceAsStream("/assets/red_deck.png"));
+            pauseImage = ImageIO.read(getClass().getResourceAsStream("/assets/pausar.png"));
             revolverImage = ImageIO.read(getClass().getResourceAsStream("/assets/revolver.png"));
         } catch (IOException e) {
             System.err.println("Erro ao carregar assets: " + e.getMessage());
@@ -152,6 +283,16 @@ public class GameScreen extends Screen {
         addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                if (pauseButton != null && pauseButton.isEnabled() && pauseButton.getBounds().contains(e.getPoint())) {
+                    pauseButton.doClick();
+                    repaint();
+                    return;
+                }
+                if (paused) {
+                    mousePos = e.getPoint();
+                    repaint();
+                    return;
+                }
                 if (rouletteState == RouletteState.NONE) {
                     if (SwingUtilities.isRightMouseButton(e)) {
                         gameState.getSelectedCards().clear();
@@ -168,7 +309,9 @@ public class GameScreen extends Screen {
             @Override
             public void mouseMoved(MouseEvent e) {
                 mousePos = e.getPoint();
-                repaint();
+                if (!paused || (pauseButton != null && pauseButton.isEnabled() && pauseButton.getBounds().contains(e.getPoint()))) {
+                    repaint();
+                }
             }
         });
     }
@@ -213,6 +356,7 @@ public class GameScreen extends Screen {
         removeAll();
         setOpaque(false);
         cardAreas.clear();
+        paused = false;
         
         if (gameState.getPlayerHand().isEmpty()) {
             gameState.startNewRound();
@@ -238,7 +382,18 @@ public class GameScreen extends Screen {
         rouletteButton.addActionListener(e -> playRussianRoulette());
         add(rouletteButton);
 
-        
+        if (pauseResumeButton != null && pauseResumeButton.getParent() != this) {
+            add(pauseResumeButton);
+        }
+        if (pauseMuteButton != null && pauseMuteButton.getParent() != this) {
+            add(pauseMuteButton);
+        }
+        if (pauseExitButton != null && pauseExitButton.getParent() != this) {
+            add(pauseExitButton);
+        }
+        hidePauseMenuButtons();
+        updatePauseAvailability();
+
         revalidate();
         repaint();
     }
@@ -314,6 +469,10 @@ public class GameScreen extends Screen {
 
         // Consome as cartas jogadas
         gameState.getPlayerHand().removeAll(gameState.getSelectedCards());
+        
+        if (pauseResumeButton != null && pauseResumeButton.getParent() != this) add(pauseResumeButton);
+        if (pauseMuteButton != null && pauseMuteButton.getParent() != this) add(pauseMuteButton);
+        if (pauseExitButton != null && pauseExitButton.getParent() != this) add(pauseExitButton);
         gameState.getGameDeck().discard(gameState.getSelectedCards());
 
         // Se a mão ficou vazia, puxa novas cartas do deck
@@ -342,6 +501,7 @@ public class GameScreen extends Screen {
 
     private void playRussianRoulette() {
         rouletteState = RouletteState.WARNING;
+        updatePauseAvailability();
         rouletteConfirmButton.setText("PUXAR GATILHO");
         spinsUsed = 0;
         setGameButtonsEnabled(false);
@@ -350,6 +510,7 @@ public class GameScreen extends Screen {
 
     private void startDiceRollCutscene() {
         rouletteState = RouletteState.ROLLING;
+        updatePauseAvailability();
         diceAnimationFrame = 0;
         rouletteSixPenalty = false;
         // Determine final result beforehand
@@ -390,6 +551,7 @@ public class GameScreen extends Screen {
             Timer pause = new Timer(900, e -> {
                 ((Timer)e.getSource()).stop();
                 rouletteState = RouletteState.RESULT;
+                updatePauseAvailability();
                 repaint();
             });
             pause.setRepeats(false);
@@ -408,6 +570,7 @@ public class GameScreen extends Screen {
     
     private void startLoadingCutscene() {
         rouletteState = RouletteState.LOADING;
+        updatePauseAvailability();
         loadingBulletIndex = 0;
         
         // Timer adding bullets one by one
@@ -425,6 +588,7 @@ public class GameScreen extends Screen {
                          ((Timer)ev.getSource()).stop();
                          // Prepara para o estado interativo
                          rouletteState = RouletteState.READY_TO_SPIN;
+                         updatePauseAvailability();
                          rouletteConfirmButton.setText("GIRAR TAMBOR");
                          spinsUsed = 0;
                          repaint();
@@ -439,6 +603,7 @@ public class GameScreen extends Screen {
 
     private void startManualSpinning() {
         rouletteState = RouletteState.SPINNING;
+        updatePauseAvailability();
         rouletteConfirmButton.setText("GIRAR MAIS!");
         if (spinsUsed < MAX_SPINS) {
             spinsUsed++;
@@ -532,12 +697,14 @@ public class GameScreen extends Screen {
         cylinderAngle = targetRot; // Simplificado: seta direto (pode animar se quiser sutileza)
         
         rouletteState = RouletteState.READY_TO_SHOOT;
+        updatePauseAvailability();
         rouletteConfirmButton.setText("ATIRAR");
         repaint();
     }
 
     private void startShootingCutscene() {
         rouletteState = RouletteState.SHOOTING;
+        updatePauseAvailability();
         shootingFrame = 0;
         
         // Shake animation timer
@@ -563,6 +730,7 @@ public class GameScreen extends Screen {
         roundDied = finalChamberSlot < bullets;
         
         rouletteState = RouletteState.FIRING;
+        updatePauseAvailability();
         firingFrame = 0;
         
         // Timer da animação de disparo (Flash ou Click)
@@ -606,6 +774,7 @@ public class GameScreen extends Screen {
             }
         }
         rouletteState = RouletteState.RESULT;
+        updatePauseAvailability();
         repaint();
     }
     
@@ -1048,6 +1217,9 @@ public class GameScreen extends Screen {
         drawDeck(g);
 
         drawPlayerHand(g);
+        if (paused) {
+            drawPauseOverlay(g);
+        }
         
         if (rouletteState != RouletteState.NONE) {
             drawRouletteOverlay(g);
@@ -1782,6 +1954,71 @@ public class GameScreen extends Screen {
         g.setColor(new Color(100, 255, 100));
         // Centraliza texto
         g.drawString(moneyText, x + (width - textWidth) / 2, y + 35);
+
+        drawPauseControl(g, x + width / 2, y + 60);
+    }
+
+    private void drawPauseControl(Graphics2D g, int centerX, int topY) {
+        if (pauseButton == null) return;
+        int size = 48;
+        pauseButton.setBounds(centerX - size / 2, topY, size, size);
+        boolean enabled = pauseButton.isEnabled();
+        boolean hover = enabled && mousePos != null && pauseButton.getBounds().contains(mousePos);
+
+        // Fundo circular sutil
+        if (hover) {
+            g.setColor(new Color(20, 60, 20, 180));
+            g.fillOval(centerX - size / 2 - 1, topY - 1, size, size);
+            g.setColor(new Color(50, 200, 50));
+            g.setStroke(new BasicStroke(3));
+            g.drawOval(centerX - size / 2 - 1, topY - 1, size, size);
+        } else if (!enabled) {
+            g.setColor(new Color(20, 20, 20, 120));
+            g.fillOval(centerX - size / 2 - 1, topY - 1, size, size);
+        }
+
+        Graphics2D g2 = (Graphics2D) g.create();
+        if (!enabled) {
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.4f));
+        }
+        g2.translate(pauseButton.getX(), pauseButton.getY());
+        pauseButton.paint(g2);
+        g2.dispose();
+
+        g.setFont(new Font("Arial", Font.PLAIN, 12));
+        if (!enabled) {
+            g.setColor(new Color(130, 130, 130));
+        } else {
+            g.setColor(hover ? new Color(150, 255, 150) : new Color(200, 200, 200));
+        }
+        String label = paused ? "Retomar" : "Pausar";
+        FontMetrics fm = g.getFontMetrics();
+        g.drawString(label, centerX - fm.stringWidth(label) / 2, topY + size + 15);
+    }
+
+    private void drawPauseOverlay(Graphics2D g) {
+        g.setColor(new Color(0, 0, 0, 120));
+        g.fillRect(0, 0, getWidth(), getHeight());
+
+        int panelWidth = 380;
+        int panelHeight = 300;
+        int panelX = (getWidth() - panelWidth) / 2;
+        int panelY = (getHeight() - panelHeight) / 2;
+
+        g.setColor(new Color(0, 0, 0, 160));
+        g.fillRoundRect(panelX + 6, panelY + 8, panelWidth, panelHeight, 28, 28);
+
+        GradientPaint gp = new GradientPaint(panelX, panelY, new Color(40, 35, 60, 230), panelX, panelY + panelHeight, new Color(20, 18, 35, 230));
+        g.setPaint(gp);
+        g.fillRoundRect(panelX, panelY, panelWidth, panelHeight, 28, 28);
+
+        g.setColor(new Color(120, 180, 255, 160));
+        g.setStroke(new BasicStroke(2f));
+        g.drawRoundRect(panelX, panelY, panelWidth, panelHeight, 28, 28);
+
+        g.setColor(new Color(255, 255, 255, 230));
+        g.setFont(new Font("Arial", Font.BOLD, 42));
+        drawCenteredText(g, "PAUSADO", panelY + 80);
     }
     
     private void drawDeck(Graphics2D g) {
@@ -1850,7 +2087,7 @@ public class GameScreen extends Screen {
             
             // Verifica hover considerando a área expandida da carta
             Rectangle cardArea = new Rectangle(x, y - 25, cardWidth, cardHeight + 25);
-            boolean isHovered = (rouletteState == RouletteState.NONE) && cardArea.contains(mousePos);
+            boolean isHovered = !paused && (rouletteState == RouletteState.NONE) && cardArea.contains(mousePos);
             if (isHovered && !isSelected) {
                 y -= 15;
             }
