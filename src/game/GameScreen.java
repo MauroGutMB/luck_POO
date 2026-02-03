@@ -153,6 +153,11 @@ public class GameScreen extends Screen {
             @Override
             public void mousePressed(MouseEvent e) {
                 if (rouletteState == RouletteState.NONE) {
+                    if (SwingUtilities.isRightMouseButton(e)) {
+                        gameState.getSelectedCards().clear();
+                        repaint();
+                        return;
+                    }
                     handleCardClick(e.getX(), e.getY());
                     handleRadioClick(e.getPoint());
                 }
