@@ -4,9 +4,12 @@ import core.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import javax.imageio.ImageIO;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -17,6 +20,8 @@ public class GameScreen extends Screen {
     private Image deckImage;
     private Image pauseImage;
     private Image revolverImage;
+    private Image sortImage;
+    private Image restoreImage;
     private GameState gameState;
     private CardRenderer cardRenderer;
     private DiceRenderer diceRenderer; // New renderer
@@ -59,8 +64,11 @@ public class GameScreen extends Screen {
     private JButton pauseResumeButton;
     private JButton pauseMuteButton;
     private JButton pauseExitButton;
+    private JButton sortOrderButton;
+    private JButton restoreOrderButton;
     private boolean paused = false;
     private boolean rouletteSixPenalty = false;
+    private List<PlayingCard> previousHandOrder;
     
     // Jukebox Radio Vars
     private Rectangle radioPrevRect;
@@ -75,9 +83,11 @@ public class GameScreen extends Screen {
         this.diceRenderer = DiceRenderer.getInstance(); // Initialize
         this.cardAreas = new ArrayList<>();
         this.mousePos = new Point(0, 0);
+        this.previousHandOrder = null;
         setupMouseListeners();
         setupRouletteButtons();
         setupPauseButton();
+        setupOrderButtons();
     }
     
     private void setupRouletteButtons() {
@@ -156,6 +166,93 @@ public class GameScreen extends Screen {
         updatePauseAvailability();
     }
 
+    private void setupOrderButtons() {
+        sortOrderButton = createIconControlButton(sortImage);
+        sortOrderButton.addActionListener(e -> {
+            if (!isOrderActionAllowed()) return;
+            List<PlayingCard> hand = gameState.getPlayerHand();
+            if (hand.size() <= 1) return;
+            previousHandOrder = new ArrayList<>(hand);
+            if (restoreOrderButton != null) {
+                restoreOrderButton.setEnabled(true);
+            }
+            hand.sort(Comparator
+                .comparingInt((PlayingCard card) -> card.getRankEnum().getValue())
+                .thenComparingInt(card -> card.getSuitEnum().ordinal()));
+            updateCardAreas();
+            updatePauseAvailability();
+            repaint();
+        });
+
+        restoreOrderButton = createIconControlButton(restoreImage);
+        restoreOrderButton.addActionListener(e -> {
+            if (!isOrderActionAllowed()) return;
+            if (previousHandOrder == null) {
+                if (restoreOrderButton != null) {
+                    restoreOrderButton.setEnabled(false);
+                }
+                updatePauseAvailability();
+                repaint();
+                return;
+            }
+            List<PlayingCard> hand = gameState.getPlayerHand();
+            if (!matchesCurrentHand(hand, previousHandOrder)) {
+                previousHandOrder = null;
+                if (restoreOrderButton != null) {
+                    restoreOrderButton.setEnabled(false);
+                }
+                updatePauseAvailability();
+                repaint();
+                return;
+            }
+            hand.clear();
+            hand.addAll(previousHandOrder);
+            previousHandOrder = null;
+            if (restoreOrderButton != null) {
+                restoreOrderButton.setEnabled(false);
+            }
+            updateCardAreas();
+            updatePauseAvailability();
+            repaint();
+        });
+
+        updatePauseAvailability();
+    }
+
+    private JButton createIconControlButton(Image icon) {
+        JButton button = new JButton() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                if (icon != null) {
+                    g2.drawImage(icon, 0, 0, getWidth(), getHeight(), null);
+                } else {
+                    g2.setColor(new Color(200, 200, 200));
+                    g2.fillOval(8, 8, getWidth() - 16, getHeight() - 16);
+                }
+                g2.dispose();
+            }
+        };
+        button.setOpaque(false);
+        button.setContentAreaFilled(false);
+        button.setBorderPainted(false);
+        button.setFocusPainted(false);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        return button;
+    }
+
+    private boolean isOrderActionAllowed() {
+        return !paused && rouletteState == RouletteState.NONE;
+    }
+
+    private boolean matchesCurrentHand(List<PlayingCard> current, List<PlayingCard> snapshot) {
+        if (current == null || snapshot == null) return false;
+        if (current.size() != snapshot.size()) return false;
+        return current.containsAll(snapshot) && snapshot.containsAll(current);
+    }
+
     private void setupPauseMenuButtons() {
         pauseResumeButton = createActionButton("RETORNAR AO JOGO", 0, 0, new Color(39, 174, 96));
         pauseResumeButton.addActionListener(e -> togglePause());
@@ -226,9 +323,17 @@ public class GameScreen extends Screen {
     }
 
     private void updatePauseAvailability() {
-        if (pauseButton == null) return;
-        boolean allowPause = rouletteState == RouletteState.NONE && !paused;
-        pauseButton.setEnabled(allowPause);
+        boolean allowControls = rouletteState == RouletteState.NONE && !paused;
+        if (pauseButton != null) {
+            pauseButton.setEnabled(allowControls);
+        }
+        if (sortOrderButton != null) {
+            boolean handHasMultiple = gameState != null && gameState.getPlayerHand().size() > 1;
+            sortOrderButton.setEnabled(allowControls && handHasMultiple);
+        }
+        if (restoreOrderButton != null) {
+            restoreOrderButton.setEnabled(allowControls && previousHandOrder != null);
+        }
     }
 
     private void togglePause() {
@@ -269,13 +374,24 @@ public class GameScreen extends Screen {
     }
     
     private void loadBackground() {
-        try {
-            backgroundImage = ImageIO.read(getClass().getResourceAsStream("/assets/bg-game.png"));
-            deckImage = ImageIO.read(getClass().getResourceAsStream("/assets/red_deck.png"));
-            pauseImage = ImageIO.read(getClass().getResourceAsStream("/assets/pausar.png"));
-            revolverImage = ImageIO.read(getClass().getResourceAsStream("/assets/revolver.png"));
+        backgroundImage = loadImage("/assets/bg-game.png");
+        deckImage = loadImage("/assets/red_deck.png");
+        pauseImage = loadImage("/assets/pausar.png");
+        revolverImage = loadImage("/assets/revolver.png");
+        sortImage = loadImage("/assets/ordenar.png");
+        restoreImage = loadImage("/assets/reverter.png");
+    }
+
+    private Image loadImage(String path) {
+        try (InputStream is = getClass().getResourceAsStream(path)) {
+            if (is == null) {
+                System.err.println("Asset não encontrado: " + path);
+                return null;
+            }
+            return ImageIO.read(new BufferedInputStream(is));
         } catch (IOException e) {
-            System.err.println("Erro ao carregar assets: " + e.getMessage());
+            System.err.println("Erro ao carregar asset " + path + ": " + e.getMessage());
+            return null;
         }
     }
     
@@ -285,6 +401,16 @@ public class GameScreen extends Screen {
             public void mousePressed(MouseEvent e) {
                 if (pauseButton != null && pauseButton.isEnabled() && pauseButton.getBounds().contains(e.getPoint())) {
                     pauseButton.doClick();
+                    repaint();
+                    return;
+                }
+                if (sortOrderButton != null && sortOrderButton.isEnabled() && sortOrderButton.getBounds().contains(e.getPoint())) {
+                    sortOrderButton.doClick();
+                    repaint();
+                    return;
+                }
+                if (restoreOrderButton != null && restoreOrderButton.isEnabled() && restoreOrderButton.getBounds().contains(e.getPoint())) {
+                    restoreOrderButton.doClick();
                     repaint();
                     return;
                 }
@@ -309,7 +435,17 @@ public class GameScreen extends Screen {
             @Override
             public void mouseMoved(MouseEvent e) {
                 mousePos = e.getPoint();
-                if (!paused || (pauseButton != null && pauseButton.isEnabled() && pauseButton.getBounds().contains(e.getPoint()))) {
+                boolean hoverControl = false;
+                if (pauseButton != null && pauseButton.isEnabled() && pauseButton.getBounds().contains(e.getPoint())) {
+                    hoverControl = true;
+                }
+                if (sortOrderButton != null && sortOrderButton.isEnabled() && sortOrderButton.getBounds().contains(e.getPoint())) {
+                    hoverControl = true;
+                }
+                if (restoreOrderButton != null && restoreOrderButton.isEnabled() && restoreOrderButton.getBounds().contains(e.getPoint())) {
+                    hoverControl = true;
+                }
+                if (!paused || hoverControl) {
                     repaint();
                 }
             }
@@ -357,6 +493,7 @@ public class GameScreen extends Screen {
         setOpaque(false);
         cardAreas.clear();
         paused = false;
+        previousHandOrder = null;
         
         if (gameState.getPlayerHand().isEmpty()) {
             gameState.startNewRound();
@@ -409,6 +546,8 @@ public class GameScreen extends Screen {
         }
         
         gameState.getPlayerHand().addAll(cards);
+        previousHandOrder = null;
+        updatePauseAvailability();
         return true;
     }
     
@@ -469,6 +608,8 @@ public class GameScreen extends Screen {
 
         // Consome as cartas jogadas
         gameState.getPlayerHand().removeAll(gameState.getSelectedCards());
+        previousHandOrder = null;
+        updatePauseAvailability();
         
         if (pauseResumeButton != null && pauseResumeButton.getParent() != this) add(pauseResumeButton);
         if (pauseMuteButton != null && pauseMuteButton.getParent() != this) add(pauseMuteButton);
@@ -794,6 +935,8 @@ public class GameScreen extends Screen {
         gameState.getPlayerHand().removeAll(gameState.getSelectedCards());
         gameState.getGameDeck().discard(gameState.getSelectedCards());
         gameState.getSelectedCards().clear();
+        previousHandOrder = null;
+        updatePauseAvailability();
         
         // Preenche a mão até voltar a ter 8 cartas
         int currentHandSize = gameState.getPlayerHand().size();
@@ -1217,6 +1360,7 @@ public class GameScreen extends Screen {
         drawDeck(g);
 
         drawPlayerHand(g);
+        drawOrderControls(g);
         if (paused) {
             drawPauseOverlay(g);
         }
@@ -1955,34 +2099,65 @@ public class GameScreen extends Screen {
         // Centraliza texto
         g.drawString(moneyText, x + (width - textWidth) / 2, y + 35);
 
-        drawPauseControl(g, x + width / 2, y + 60);
+        int controlsCenter = x + width / 2;
+        int controlsTop = y + 60;
+        drawPauseControl(g, controlsCenter, controlsTop);
     }
 
-    private void drawPauseControl(Graphics2D g, int centerX, int topY) {
-        if (pauseButton == null) return;
-        int size = 48;
-        pauseButton.setBounds(centerX - size / 2, topY, size, size);
-        boolean enabled = pauseButton.isEnabled();
-        boolean hover = enabled && mousePos != null && pauseButton.getBounds().contains(mousePos);
+    private void drawOrderControls(Graphics2D g) {
+        if (sortOrderButton == null || restoreOrderButton == null) return;
+        int sortWidth = 120;
+        int sortHeight = 48;
+        int restoreSize = 48;
+        int marginBottom = 40;
+        int marginRight = 40;
+        int gap = 20;
 
-        // Fundo circular sutil
+        int baseTop = getHeight() - sortHeight - marginBottom + 10;
+        if (baseTop < 40) {
+            baseTop = 40;
+        }
+
+        int restoreLeft = getWidth() - marginRight - restoreSize;
+        int restoreCenterX = restoreLeft + restoreSize / 2;
+        drawIconControl(g, restoreOrderButton, "Original", restoreCenterX, baseTop, restoreSize, restoreSize);
+
+        int sortLeft = restoreLeft - gap - sortWidth;
+        int sortCenterX = sortLeft + sortWidth / 2;
+        drawIconControl(g, sortOrderButton, "Ordenar", sortCenterX, baseTop, sortWidth, sortHeight);
+    }
+
+    private void drawIconControl(Graphics2D g, JButton button, String label, int centerX, int topY) {
+        drawIconControl(g, button, label, centerX, topY, 48, 48);
+    }
+
+    private void drawIconControl(Graphics2D g, JButton button, String label, int centerX, int topY, int width, int height) {
+        if (button == null) return;
+        int left = centerX - width / 2;
+        button.setBounds(left, topY, width, height);
+        boolean enabled = button.isEnabled();
+        boolean hover = enabled && mousePos != null && button.getBounds().contains(mousePos);
+
+        int highlightInset = 1;
         if (hover) {
             g.setColor(new Color(20, 60, 20, 180));
-            g.fillOval(centerX - size / 2 - 1, topY - 1, size, size);
+            drawHighlightShape(g, left - highlightInset, topY - highlightInset, width + highlightInset * 2, height + highlightInset * 2, width, height);
             g.setColor(new Color(50, 200, 50));
+            Stroke previous = g.getStroke();
             g.setStroke(new BasicStroke(3));
-            g.drawOval(centerX - size / 2 - 1, topY - 1, size, size);
+            drawHighlightOutline(g, left - highlightInset, topY - highlightInset, width + highlightInset * 2, height + highlightInset * 2, width, height);
+            g.setStroke(previous);
         } else if (!enabled) {
             g.setColor(new Color(20, 20, 20, 120));
-            g.fillOval(centerX - size / 2 - 1, topY - 1, size, size);
+            drawHighlightShape(g, left - highlightInset, topY - highlightInset, width + highlightInset * 2, height + highlightInset * 2, width, height);
         }
 
         Graphics2D g2 = (Graphics2D) g.create();
         if (!enabled) {
             g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.4f));
         }
-        g2.translate(pauseButton.getX(), pauseButton.getY());
-        pauseButton.paint(g2);
+        g2.translate(button.getX(), button.getY());
+        button.paint(g2);
         g2.dispose();
 
         g.setFont(new Font("Arial", Font.PLAIN, 12));
@@ -1991,9 +2166,33 @@ public class GameScreen extends Screen {
         } else {
             g.setColor(hover ? new Color(150, 255, 150) : new Color(200, 200, 200));
         }
+        if (label != null) {
+            FontMetrics fm = g.getFontMetrics();
+            g.drawString(label, centerX - fm.stringWidth(label) / 2, topY + height + 15);
+        }
+    }
+
+    private void drawHighlightShape(Graphics2D g, int x, int y, int width, int height, int originalWidth, int originalHeight) {
+        if (originalWidth == originalHeight) {
+            g.fillOval(x, y, width, height);
+        } else {
+            int arc = Math.min(originalWidth, originalHeight);
+            g.fillRoundRect(x, y, width, height, arc, arc);
+        }
+    }
+
+    private void drawHighlightOutline(Graphics2D g, int x, int y, int width, int height, int originalWidth, int originalHeight) {
+        if (originalWidth == originalHeight) {
+            g.drawOval(x, y, width, height);
+        } else {
+            int arc = Math.min(originalWidth, originalHeight);
+            g.drawRoundRect(x, y, width, height, arc, arc);
+        }
+    }
+
+    private void drawPauseControl(Graphics2D g, int centerX, int topY) {
         String label = paused ? "Retomar" : "Pausar";
-        FontMetrics fm = g.getFontMetrics();
-        g.drawString(label, centerX - fm.stringWidth(label) / 2, topY + size + 15);
+        drawIconControl(g, pauseButton, label, centerX, topY);
     }
 
     private void drawPauseOverlay(Graphics2D g) {
